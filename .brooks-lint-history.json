@@ -1,0 +1,46 @@
+[
+  {
+    "date": "2026-09-28",
+    "mode": "Health Dashboard",
+    "score": 71,
+    "findings": {
+      "critical": 4,
+      "warning": 1,
+      "suggestion": 0
+    },
+    "scope": "geo-assistant-clean (entire project)"
+  },
+  {
+    "date": "2026-09-30",
+    "mode": "Health Dashboard",
+    "score": 70,
+    "findings": {
+      "critical": 3,
+      "warning": 2,
+      "suggestion": 1
+    },
+    "scope": "geo-assistant-clean (entire monorepo: apps/* + packages/*)"
+  },
+  {
+    "date": "2026-10-09",
+    "mode": "Full Sweep",
+    "score": 82,
+    "findings": {
+      "critical": 0,
+      "warning": 4,
+      "suggestion": 3
+    },
+    "scope": "packages/ai-engine/src/ + apps/server/.env.example (14 files)"
+  },
+  {
+    "date": "2026-10-09",
+    "mode": "Full Sweep",
+    "score": 86,
+    "findings": {
+      "critical": 0,
+      "warning": 2,
+      "suggestion": 4
+    },
+    "scope": "packages/ai-engine/src/ (14 files + 1 new: summary-utils.ts)"
+  }
+]

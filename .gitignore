@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.turbo/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+
+# Legacy debug scripts (archived, not part of the project)
+scripts-archive/
+
+# Tool-specific
+.playwright-mcp/
+.claude/
+
+# Large unrelated assets
+*.png
+!**/*.png.meta

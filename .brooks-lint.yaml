@@ -1,0 +1,24 @@
+version: 1
+
+# 禁用的风险检查（已知可接受或不适用）
+disable: []
+
+# 风险严重度覆盖
+severity:
+  # 示例：将 R1 降级为 suggestion（默认是 critical）
+  # R1: suggestion
+
+# 忽略的文件/路径
+ignore:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/*.generated.*"
+  - "**/data/**"
+  - "**/content-review-intro/**"
+  - "**/.spec-workflow/**"
+
+# 重点关注的风险（如设置则只检查这些）
+# focus:
+#   - R1
+#   - R2

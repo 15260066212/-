@@ -1,0 +1,1 @@
+{"root":["./src/index.ts","./src/reviewer.test.ts","./src/reviewer.ts","./src/scorer.ts","./src/types.ts","./src/rules/brand.ts","./src/rules/compliance.ts","./src/rules/originality.ts","./src/rules/platform-adaptation.ts","./src/rules/quality.ts","./src/rules/readability.ts","./src/rules/seo.ts"],"version":"5.9.3"}

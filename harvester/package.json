@@ -1,0 +1,21 @@
+{
+  "name": "geo-harvester",
+  "version": "1.0.0",
+  "description": "Cookie harvesting service with Playwright + noVNC",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.22.3",
+    "fingerprint-injector": "^2.1.88",
+    "playwright": "^1.40.0",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0",
+    "vitest": "^3.2.7"
+  }
+}

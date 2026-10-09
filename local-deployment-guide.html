@@ -1,0 +1,444 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEO系统本地部署操作指南</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-light: #dbeafe;
+    --success: #16a34a;
+    --success-light: #dcfce7;
+    --warning: #d97706;
+    --warning-light: #fef3c7;
+    --danger: #dc2626;
+    --danger-light: #fee2e2;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --code-bg: #1e293b;
+    --code-text: #e2e8f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+  .header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    color: white;
+    padding: 40px 20px;
+    text-align: center;
+  }
+  .header h1 { font-size: 28px; margin-bottom: 8px; }
+  .header p { opacity: 0.85; font-size: 14px; }
+  .container { max-width: 900px; margin: 0 auto; padding: 24px 20px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .card h2 {
+    font-size: 20px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+    color: var(--primary);
+  }
+  .card h3 {
+    font-size: 16px;
+    margin: 16px 0 8px;
+    color: var(--text);
+  }
+  .card p { margin-bottom: 8px; }
+  .card ul, .card ol { margin: 8px 0 8px 20px; }
+  .card li { margin-bottom: 4px; }
+  code {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .badge-success { background: var(--success-light); color: var(--success); }
+  .badge-warning { background: var(--warning-light); color: var(--warning); }
+  .badge-danger { background: var(--danger-light); color: var(--danger); }
+  .alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  .alert-warning { background: var(--warning-light); border-left: 4px solid var(--warning); }
+  .alert-danger { background: var(--danger-light); border-left: 4px solid var(--danger); }
+  .alert-info { background: var(--primary-light); border-left: 4px solid var(--primary); }
+  .step {
+    display: flex;
+    gap: 12px;
+    margin: 12px 0;
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 28px;
+    height: 28px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .step-content { flex: 1; }
+  .step-content h4 { font-size: 15px; margin-bottom: 4px; }
+  .table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  .table th, .table td {
+    padding: 8px 12px;
+    text-align: left;
+    border: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .table th { background: var(--bg); font-weight: 600; }
+  .footer {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>GEO系统本地部署操作指南</h1>
+  <p>芯图引擎：GEO | 生成式引擎搜索优化系统 | 版本 1.0</p>
+</div>
+
+<div class="container">
+
+<!-- 系统架构 -->
+<div class="card">
+  <h2>1. 系统架构概览</h2>
+  <p> GEO系统由三个独立服务组成，需在本地开发机上同时运行：</p>
+  <table class="table">
+    <thead>
+      <tr><th>服务</th><th>端口</th><th>启动命令</th><th>功能</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>后端服务器</td>
+        <td>3000</td>
+        <td><code>npx tsx watch src/index.ts</code></td>
+        <td>API服务、任务调度、RPA引擎、AI内容生成</td>
+      </tr>
+      <tr>
+        <td>前端界面</td>
+        <td>5174</td>
+        <td><code>npx vite</code></td>
+        <td>品牌配置、文章管理、发布控制台</td>
+      </tr>
+      <tr>
+        <td>Harvester采集器</td>
+        <td>3003</td>
+        <td><code>node server.js</code></td>
+        <td>浏览器Cookie采集、凭据管理、同步</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="alert alert-info">
+    <strong>前置要求：</strong>Node.js v22+、npm（非pnpm）、Playwright Chromium浏览器（<code>npx playwright install chromium</code>）
+  </div>
+</div>
+
+<!-- 启动流程 -->
+<div class="card">
+  <h2>2. 系统启动流程</h2>
+  
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <h4>安装依赖</h4>
+      <pre><code>cd geo-assistant-clean
+npm install
+cd harvester
+npm install</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <h4>构建所有包</h4>
+      <pre><code># 在项目根目录执行
+cd packages/shared &amp;&amp; npx tsc
+cd ../content-generator &amp;&amp; npx tsc
+cd ../content-reviewer &amp;&amp; npx tsc
+cd ../publisher &amp;&amp; npx tsc
+
+# 同步到node_modules
+Copy-Item packages\shared\dist node_modules\@zemingengine\shared\dist -Recurse -Force
+Copy-Item packages\content-generator\dist node_modules\@zemingengine\content-generator\dist -Recurse -Force
+Copy-Item packages\content-reviewer\dist node_modules\@zemingengine\content-reviewer\dist -Recurse -Force
+Copy-Item packages\publisher\dist node_modules\@zemingengine\publisher\dist -Recurse -Force</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <h4>启动后端服务器</h4>
+      <pre><code>cd apps\server
+npx tsx watch src\index.ts</code></pre>
+      <p>看到 <code>芯图引擎：GEO server running at http://localhost:3000</code> 表示启动成功。</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <h4>启动前端界面（新终端）</h4>
+      <pre><code>cd apps\frontend
+npx vite</code></pre>
+      <p>访问 <code>http://localhost:5174</code> 进入管理界面。</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <h4>启动Harvester采集器（新终端）</h4>
+      <pre><code>cd harvester
+node server.js</code></pre>
+      <p>看到 <code>Harvester server running on port 3003</code> 表示启动成功。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Cookie采集 -->
+<div class="card">
+  <h2>3. 平台Cookie采集流程</h2>
+  <p>自动化发布需要各平台的登录Cookie。通过Harvester采集器在可视化浏览器中完成登录，自动提取Cookie。</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <h4>启动浏览器会话</h4>
+      <pre><code># 以知乎为例
+curl -X POST http://localhost:3003/api/session/start \
+  -H "Content-Type: application/json" \
+  -d '{"platform": "zhihu"}'</code></pre>
+      <p>Harvester会打开Chromium浏览器并跳转到平台登录页。</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <h4>在浏览器中完成登录</h4>
+      <p>在弹出的浏览器窗口中，手动完成登录操作：</p>
+      <ul>
+        <li>输入手机号/邮箱和密码</li>
+        <li>完成验证码、滑块等安全验证</li>
+        <li>登录成功后页面会跳转到平台首页</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <h4>采集Cookie</h4>
+      <pre><code># 用返回的sessionId查询状态
+curl http://localhost:3003/api/session/{sessionId}/cookies</code></pre>
+      <p>当 <code>loggedIn: true</code> 时表示检测到认证Cookie，可以采集。</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <h4>同步Cookie到主服务器</h4>
+      <pre><code>curl -X POST http://localhost:3003/api/credentials/sync</code></pre>
+      <p>采集的Cookie会自动保存到Harvester，调用sync接口推送到主服务器。</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <h4>关闭浏览器会话</h4>
+      <pre><code>curl -X POST http://localhost:3003/api/session/{sessionId}/close</code></pre>
+    </div>
+  </div>
+
+  <h3>各平台认证Cookie</h3>
+  <table class="table">
+    <thead>
+      <tr><th>平台</th><th>认证Cookie</th><th>登录URL</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>CSDN</td><td>UserName / UserToken / C_SESSION</td><td>passport.csdn.net/login</td></tr>
+      <tr><td>知乎</td><td>q_c1 / unlock_ticket（z_c0已废弃）</td><td>www.zhihu.com/signin</td></tr>
+      <tr><td>百家号</td><td>BDUSS</td><td>baijiahao.baidu.com</td></tr>
+      <tr><td>头条号</td><td>sessionid</td><td>mp.toutiao.com</td></tr>
+      <tr><td>掘金</td><td>sessionid</td><td>juejin.cn/login</td></tr>
+      <tr><td>微信公众号</td><td>API Key（非Cookie）</td><td>mp.weixin.qq.com</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 文章发布 -->
+<div class="card">
+  <h2>4. 自动化发布流程</h2>
+
+  <h3>4.1 通过前端界面发布</h3>
+  <ol>
+    <li>访问 <code>http://localhost:5174</code></li>
+    <li>进入"文章管理"页面</li>
+    <li>选择要发布的文章</li>
+    <li>点击"发布"按钮，选择目标平台和发布方式（RPA）</li>
+    <li>系统自动创建发布任务并排队</li>
+  </ol>
+
+  <h3>4.2 通过API发布</h3>
+  <pre><code># 创建发布任务
+curl -X POST http://localhost:3000/api/publish \
+  -H "Content-Type: application/json" \
+  -d '{
+    "articleId": "art_xxx",
+    "platform": "csdn",
+    "method": "rpa"
+  }'
+
+# 查询发布状态
+curl http://localhost:3000/api/publish?articleId=art_xxx</code></pre>
+
+  <h3>4.3 任务调度</h3>
+  <p>调度器每30秒轮询一次待处理任务，自动执行发布操作。失败任务会自动重试（最多2次）。</p>
+  <ul>
+    <li><strong>pending</strong> — 等待调度器处理</li>
+    <li><strong>publishing</strong> — 正在执行RPA发布</li>
+    <li><strong>published</strong> — 发布成功</li>
+    <li><strong>failed</strong> — 发布失败（已耗尽重试次数）</li>
+  </ul>
+</div>
+
+<!-- 已知问题和解决方案 -->
+<div class="card">
+  <h2>5. 已知问题与解决方案</h2>
+
+  <h3>5.1 CSDN编辑器在iframe中 <span class="badge badge-success">已修复</span></h3>
+  <p>CSDN的博客编辑器页面使用iframe渲染内容区域，主页面没有contenteditable元素。RPA Handler已添加iframe检测和内容填充逻辑。</p>
+  <pre><code># 诊断日志会输出编辑器结构信息
+[CSDN RPA] Editor diagnostics: { editables: [], iframeCount: 2, ... }</code></pre>
+
+  <h3>5.2 知乎认证机制变更 <span class="badge badge-success">已适配</span></h3>
+  <p>知乎已废弃 <code>z_c0</code> 认证Cookie，改用 <code>q_c1</code> 和 <code>unlock_ticket</code>。RPA Handler已更新认证检测逻辑，接受三种Cookie中的任意一种。</p>
+
+  <h3>5.3 VM网络限制 <span class="badge badge-warning">环境限制</span></h3>
+  <div class="alert alert-warning">
+    <strong>重要：</strong>当前VM环境存在网络限制，无法访问部分外部平台（如 <code>zhuanlan.zhihu.net</code>）。
+    自动化发布功能必须在能正常访问外网的本地开发机上运行。
+  </div>
+
+  <h3>5.4 TypeScript构建问题</h3>
+  <ul>
+    <li><strong>DOM类型缺失：</strong>publisher包的tsconfig需包含 <code>"lib": ["ES2022", "DOM"]</code></li>
+    <li><strong>paths冲突：</strong>tsconfig.base.json中不要配置paths映射，依赖node_modules中的构建产物</li>
+    <li><strong>包同步：</strong>修改packages/*后需手动同步dist到node_modules/@zemingengine/*</li>
+  </ul>
+
+  <h3>5.5 端口冲突</h3>
+  <pre><code># 查看并清理端口占用
+Get-NetTCPConnection -LocalPort 3000 | Select OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }</code></pre>
+
+  <h3>5.6 Playwright浏览器未安装</h3>
+  <pre><code>npx playwright install chromium</code></pre>
+</div>
+
+<!-- 快速启动脚本 -->
+<div class="card">
+  <h2>6. 快速启动脚本</h2>
+  <p>将以下内容保存为 <code>start-all.ps1</code>，一键启动所有服务：</p>
+  <pre><code># start-all.ps1 - GEO系统一键启动
+$root = "c:\Users\Administrator\Desktop\trae work GEO\geo-assistant-clean"
+
+# 清理端口
+3000,5174,3003 | ForEach-Object {
+  Get-NetTCPConnection -LocalPort $_ -EA SilentlyContinue |
+    Select -Expand OwningProcess |
+    ForEach-Object { Stop-Process -Id $_ -Force -EA SilentlyContinue }
+}
+
+# 启动后端
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$root\apps\server'; npx tsx watch src/index.ts"
+
+# 启动前端
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$root\apps\frontend'; npx vite"
+
+# 启动Harvester
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$root\harvester'; node server.js"
+
+Write-Host "所有服务已启动！"
+Write-Host "后端: http://localhost:3000"
+Write-Host "前端: http://localhost:5174"
+Write-Host "Harvester: http://localhost:3003"</code></pre>
+</div>
+
+<!-- 验证清单 -->
+<div class="card">
+  <h2>7. 部署验证清单</h2>
+  <table class="table">
+    <thead>
+      <tr><th>验证项</th><th>方法</th><th>预期结果</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>后端健康</td><td><code>GET /api/health</code></td><td>status: "ok", database.healthy: true</td></tr>
+      <tr><td>前端加载</td><td>访问 localhost:5174</td><td>显示品牌配置界面</td></tr>
+      <tr><td>Harvester健康</td><td><code>GET :3003/health</code></td><td>status: "healthy"</td></tr>
+      <tr><td>凭据已同步</td><td><code>GET /api/credentials</code></td><td>显示csdn、zhihu等平台凭据</td></tr>
+      <tr><td>文章存在</td><td><code>GET /api/articles</code></td><td>返回文章列表</td></tr>
+      <tr><td>发布任务</td><td><code>POST /api/publish</code></td><td>创建pending状态任务</td></tr>
+      <tr><td>RPA执行</td><td>观察后端日志</td><td>Browser launched + Publishing to xxx</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <p>芯图引擎：GEO GEO系统 | 本地部署操作指南 | 生成日期: 2026-08-25</p>
+</div>
+
+</div>
+</body>
+</html>

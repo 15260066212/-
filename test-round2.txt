@@ -1,0 +1,1825 @@
+﻿
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/Users/Administrator/Desktop/trae work GEO/geo-assistant-clean[39m
+
+[90mstdout[2m | apps/server/src/cache.test.ts[2m > [22m[2mLRUCache[2m > [22m[2mcleanup[2m > [22m[2mshould remove expired entries
+[22m[39m[Cache] Cleanup: removed 1 expired entry
+
+ [32m✓[39m packages/manual-generator/src/template.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m apps/server/src/cache.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m packages/publisher/src/rpa-handlers/baidu-zhidao.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m packages/ai-engine/src/ai-engine.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m packages/scraper/src/scraper.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m packages/content-reviewer/src/reviewer.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m packages/dialogue-engine/src/state-machine.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m packages/content-generator/src/generator.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+[90mstdout[2m | packages/publisher/src/publisher.test.ts[2m > [22m[2mPublisher.publishWithRetry[2m > [22m[2m成功发布时只尝试一次，不触发重试
+[22m[39m[Publisher] [INFO] Publish attempt 1/3 for weixin { articleId: [32m'article-1'[39m, attempt: [33m1[39m, isRetry: [33mfalse[39m }
+
+[90mstdout[2m | packages/publisher/src/publisher.test.ts[2m > [22m[2mPublisher.publishWithRetry[2m > [22m[2m成功发布时只尝试一次，不触发重试
+[22m[39m[Publisher] [INFO] Publish succeeded on attempt 1 { postId: [32m'mock_post_id'[39m, postUrl: [32m'https://example.com'[39m }
+
+[90mstdout[2m | packages/publisher/src/publisher.test.ts[2m > [22m[2mPublisher.publishWithRetry[2m > [22m[2m失败时自动重试到 maxRetries+1 次后返回失败
+[22m[39m[Publisher] [INFO] Publish attempt 1/2 for weixin { articleId: [32m'article-1'[39m, attempt: [33m1[39m, isRetry: [33mfalse[39m }
+
+[90mstdout[2m | packages/publisher/src/publisher.test.ts[2m > [22m[2mPublisher.publishWithRetry[2m > [22m[2m失败时自动重试到 maxRetries+1 次后返回失败
+[22m[39m[Publisher] [WARN] Publish attempt 1 failed {
+  error: [32m'Mock publish failure'[39m,
+  failureType: [32m'unknown'[39m,
+  failureCategory: [32m'未知错误'[39m,
+  retryable: [33mtrue[39m
+}
+[Publisher] [INFO] Waiting 3000ms before retry 2 { delayMs: [33m3000[39m, failureType: [32m'unknown'[39m }
+
+ [32m✓[39m packages/publisher/src/rpa-handlers/all-handlers.test.ts [2m([22m[2m40 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Sessions[2m > [22m[2mshould upsert and retrieve a session with correct data
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Sessions[2m > [22m[2mshould update existing session on upsert
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Sessions[2m > [22m[2mshould return undefined for non-existent session
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Sessions[2m > [22m[2mshould delete session and make it unretrievable
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Articles[2m > [22m[2mshould insert and retrieve an article with all fields
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Articles[2m > [22m[2mshould get articles filtered by sessionId
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Articles[2m > [22m[2mshould update article status
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Articles[2m > [22m[2mshould get articles filtered by status
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Reviews[2m > [22m[2mshould insert and retrieve reviews by article id
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Reviews[2m > [22m[2mshould get the latest review for an article
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Reviews[2m > [22m[2mshould properly reconstruct nested dimension issues from storage
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Publish Tasks[2m > [22m[2mshould insert and retrieve a publish task by id
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Publish Tasks[2m > [22m[2mshould update task status and platformPostId
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Publish Tasks[2m > [22m[2mshould return only pending and retrying tasks as pending
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Publish Logs[2m > [22m[2mshould insert and retrieve logs by task id
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Credentials[2m > [22m[2mshould upsert and retrieve a credential by platform
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Credentials[2m > [22m[2mshould update existing credential on upsert
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Credentials[2m > [22m[2mshould update credential status independently
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Credentials[2m > [22m[2mshould delete a credential and make it unretrievable
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Credentials[2m > [22m[2mshould return all stored credentials
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Pipeline Runs[2m > [22m[2mshould insert and retrieve a pipeline run by id
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Pipeline Runs[2m > [22m[2mshould update pipeline run progress fields
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Pipeline Runs[2m > [22m[2mshould mark pipeline run as completed with finished timestamp
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Pipeline Runs[2m > [22m[2mshould get the latest pipeline run by session id
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Publish Tasks Advanced[2m > [22m[2mshould get tasks filtered by multiple statuses
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Publish Tasks Advanced[2m > [22m[2mshould return empty array when given an empty status list
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Publish Tasks Advanced[2m > [22m[2mshould get scheduled tasks with pending status and scheduledAt set
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Publish Tasks Advanced[2m > [22m[2mshould get queue status with counts grouped per status
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Review Advanced[2m > [22m[2mshould return true when article has a passing review
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Review Advanced[2m > [22m[2mshould return false when article has only a failing review
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Review Advanced[2m > [22m[2mshould return false when article has no reviews at all
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Review Advanced[2m > [22m[2mshould get latest review status with passed and score
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Review Advanced[2m > [22m[2mshould return null for latest review status when no reviews exist
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Credentials Advanced[2m > [22m[2mshould get credentials filtered by platform
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Credentials Advanced[2m > [22m[2mshould handle multi-account credentials on the same platform
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Credentials Advanced[2m > [22m[2mshould return credentials due for health check
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Credentials Advanced[2m > [22m[2mshould record health check and preserve active status when valid
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Users[2m > [22m[2mshould insert and find a user by username
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Users[2m > [22m[2mshould find a user by api key
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Users[2m > [22m[2mshould find a user by id
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Users[2m > [22m[2mshould return undefined for non-existent users
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Users[2m > [22m[2mshould list all users with correct count
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Users[2m > [22m[2mshould delete a user and make them unretrievable
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Users[2m > [22m[2mshould prevent deletion of the default user
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Users[2m > [22m[2mshould regenerate user api key with a new non-empty value
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Monitor Stats[2m > [22m[2mshould get article stats with total count
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Monitor Stats[2m > [22m[2mshould get session count and increment after upsert
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Monitor Stats[2m > [22m[2mshould get credential stats with active and expired counts
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Monitor Stats[2m > [22m[2mshould get publish task stats with total count
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Monitor Stats[2m > [22m[2mshould get pipeline run stats with completed and running counts
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/db.test.ts[2m > [22m[2mDatabaseAccess - Monitor Stats[2m > [22m[2mshould get articles grouped by platform stats
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+ [32m✓[39m apps/server/src/db.test.ts [2m([22m[2m51 tests[22m[2m)[22m[33m 2263[2mms[22m[39m
+   [33m[2m✓[22m[39m DatabaseAccess - Credentials Advanced[2m > [22mshould handle multi-account credentials on the same platform [33m 360[2mms[22m[39m
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mSession Routes[2m > [22m[2mPOST / - should create a new session and return sessionId, sessionData, introMessage
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mSession Routes[2m > [22m[2mGET /:id - should return 200 for an existing session
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mSession Routes[2m > [22m[2mGET /:id - should return 404 for a non-existent session
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mSession Routes[2m > [22m[2mGET / - should list all sessions
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mSession Routes[2m > [22m[2mDELETE /:id - should return 200 and make session unretrievable
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mSession Routes[2m > [22m[2mDELETE /:id - should return 404 for a non-existent session
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mGET / - should return an empty list when no articles exist
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mGET /?sessionId= - should return articles filtered by sessionId
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mGET /?status= - should return articles filtered by status
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mGET / - should return all articles when no filter is provided
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mGET /:id - should return 200 with full article data for an existing article
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mGET /:id - should return 404 for a non-existent article
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mPUT /:id - should update an existing article and return 200
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mPUT /:id - should return 404 for a non-existent article
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mDELETE /:id - should soft-delete (status -> failed) an existing article and return 200
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mArticle Routes[2m > [22m[2mDELETE /:id - should return 404 for a non-existent article
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mReview Routes[2m > [22m[2mGET /:articleId/latest - should return 200 with review data for an article with a review
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mReview Routes[2m > [22m[2mGET /:articleId/latest - should return 404 when no review exists
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mReview Routes[2m > [22m[2mGET /:articleId - should return all reviews for an article
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mReview Routes[2m > [22m[2mGET /:articleId - should return an empty list for an article without reviews
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mCredential Routes[2m > [22m[2mPUT /:platform - should save credentials and return masked data
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mCredential Routes[2m > [22m[2mPUT /:platform - should mask short values (<=4 chars) as ****
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mCredential Routes[2m > [22m[2mGET / - should return all credentials with masked data
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | packages/publisher/src/publisher.test.ts[2m > [22m[2mPublisher.publishWithRetry[2m > [22m[2m失败时自动重试到 maxRetries+1 次后返回失败
+[22m[39m[Publisher] [INFO] Publish attempt 2/2 for weixin {
+  articleId: [32m'article-1'[39m,
+  attempt: [33m2[39m,
+  isRetry: [33mtrue[39m,
+  failureType: [32m'unknown'[39m,
+  failureCategory: [32m'未知错误'[39m
+}
+
+[90mstdout[2m | packages/publisher/src/publisher.test.ts[2m > [22m[2mPublisher.publishWithRetry[2m > [22m[2m失败时自动重试到 maxRetries+1 次后返回失败
+[22m[39m[Publisher] [WARN] Publish attempt 2 failed {
+  error: [32m'Mock publish failure'[39m,
+  failureType: [32m'unknown'[39m,
+  failureCategory: [32m'未知错误'[39m,
+  retryable: [33mtrue[39m
+}
+
+ [32m✓[39m packages/publisher/src/publisher.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 3030[2mms[22m[39m
+   [33m[2m✓[22m[39m Publisher.publishWithRetry[2m > [22m失败时自动重试到 maxRetries+1 次后返回失败 [33m 3005[2mms[22m[39m
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mCredential Routes[2m > [22m[2mGET /:platform - should return 200 with masked data for an existing credential
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mCredential Routes[2m > [22m[2mGET /:platform - should return 404 for a non-existent credential
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mCredential Routes[2m > [22m[2mPOST /:platform/validate - should validate existing credentials successfully
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mCredential Routes[2m > [22m[2mPOST /:platform/validate - should return 404 for a non-existent credential
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mCredential Routes[2m > [22m[2mDELETE /:platform - should delete credentials and confirm deletion
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mPipeline Routes[2m > [22m[2mGET /status/:sessionId - should return article counts and summaries
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mPipeline Routes[2m > [22m[2mGET /status/:sessionId - should include the latest pipeline run when one exists
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mPipeline Routes[2m > [22m[2mGET /status/:sessionId - should return zero counts for a session with no articles
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mPipeline Routes[2m > [22m[2mGET /run/:runId - should return 200 with full data for an existing pipeline run
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+[90mstdout[2m | apps/server/src/routes.test.ts[2m > [22m[2mPipeline Routes[2m > [22m[2mGET /run/:runId - should return 404 for a non-existent pipeline run
+[22m[39m[DB] Migration v17 applied: review_round on articles
+[DB] Migration v18 applied: publish_url on articles
+[DB] Migration v1 applied: added review dimension columns
+[DB] Migration v13 applied: review audit trail, content hash, and safety dimension
+[DB] Migration v3 applied: added verification columns to publish_tasks
+[DB] Migration v5 applied: added failure_type column to publish_tasks
+[DB] Migration v6 applied: added user_id column to publish_tasks
+[DB] Migration v12 applied: publish task priority and cooldown fields
+[DB] Migration v14 applied: multi-account support (account_id, brand_id)
+[DB] Migration v2 applied: added pipeline_runs table
+[DB] Migration v7 applied: session health monitoring
+[DB] Migration v8 applied: health alerts table
+[DB] Migration v9 applied: relogin tracking table
+[DB] Migration v10 applied: selector health monitoring table
+[DB] Migration v11 applied: captcha event tracking table
+[DB] Default admin user created with API key: geo-1790... (set DEFAULT_ADMIN_API_KEY to customize)
+[DB] Migration v4 applied: added multi-user support
+[DB] Migration v15 applied: password_hash on users
+[DB] Migration v16 applied: optimization_plans + scheduled_plan_tasks
+
+ [32m✓[39m apps/server/src/routes.test.ts [2m([22m[2m33 tests[22m[2m)[22m[33m 1089[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m12 passed[39m[22m[90m (12)[39m
+[2m      Tests [22m [1m[32m241 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (242)[39m
+[2m   Start at [22m 09:41:46
+[2m   Duration [22m 6.61s[2m (transform 6.84s, setup 0ms, collect 15.90s, tests 6.58s, environment 4ms, prepare 4.12s)[22m
+

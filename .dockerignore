@@ -1,0 +1,14 @@
+node_modules
+dist
+.turbo
+*.log
+.env
+.git
+.github
+.spec-workflow
+docs
+*.db
+*.db-shm
+*.db-wal
+coverage
+.vscode

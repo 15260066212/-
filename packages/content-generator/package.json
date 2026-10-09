@@ -1,0 +1,20 @@
+{
+  "name": "@zemingengine/content-generator",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --test dist/**/*.test.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@zemingengine/shared": "*",
+    "@zemingengine/ai-engine": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

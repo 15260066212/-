@@ -1,0 +1,12 @@
+{
+  "name": "@zemingengine/session-pool",
+  "version": "1.0.0",
+  "description": "Browser session pool with persistent context management for Playwright",
+  "main": "src/index.ts",
+  "dependencies": {
+    "playwright": "^1.48.0",
+    "better-sqlite3": "^11.0.0",
+    "@zemingengine/account-vault": "file:../account-vault",
+    "@zemingengine/shared": "file:../shared"
+  }
+}
