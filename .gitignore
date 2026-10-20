@@ -70,3 +70,19 @@ probe-*.js
 # ---------- Extension dist lives OUTSIDE the repo ----------
 # /home/ubuntu/wechatsync-ext is a node_modules-style artifact; tracked by
 # rsync, not git.
+
+# ---------- Debug / one-off scripts (generated locally, never ship) ----------
+batch_publish.js
+check-users.js
+check_*.js
+delete*.js
+debug_*.js
+
+# ---------- Backup build artifacts ----------
+*.backup.profile/
+dist.bak.*
+dist.backup.*
+
+# ---------- Per-node sqlite databases (credentials/accounts live here) ----------
+apps/server/data/
+data/
