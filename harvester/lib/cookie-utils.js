@@ -7,6 +7,7 @@ const PLATFORM_DOMAINS = {
   zhihu: ['zhihu.com'],
   baijiahao: ['baidu.com'],
   toutiaohao: ['toutiao.com'],
+  toutiao: ['toutiao.com'],
   csdn: ['csdn.net'],
   juejin: ['juejin.cn'],
   xiaohongshu: ['xiaohongshu.com'],
@@ -26,7 +27,8 @@ function getAuthCookieNames(platform) {
   const authCookies = {
     zhihu: ['z_c0'],
     baijiahao: ['BDUSS', 'STOKEN'],
-    toutiaohao: ['sessionid', 's_v_web_id'],
+    toutiaohao: ['sessionid', 'sessionid_ss', 'sid_tt', 'uid_tt'],
+    toutiao: ['sessionid', 'sessionid_ss', 'sid_tt', 'uid_tt'],
     csdn: ['UserName', 'UserToken', 'C_SESSION'],
     juejin: ['sessionid', 'sessionid_ss'],
     xiaohongshu: ['web_session', 'a1'],
