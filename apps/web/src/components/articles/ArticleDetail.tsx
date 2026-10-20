@@ -226,6 +226,12 @@ export function ArticleDetail() {
                 查看发布文章
               </a>
             )}
+            {article.status === 'draft_saved' && (
+              <span className="inline-flex items-center gap-1 text-amber-600 text-xs" title="文章已保存到平台草稿箱，但未正式发布">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                文章仅存草稿，未正式发布
+              </span>
+            )}
             <span>
               类型：
               <span className="text-gray-700">

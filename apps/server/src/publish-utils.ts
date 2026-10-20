@@ -38,6 +38,25 @@ export async function executePublishWithHandling(
       if (logPrefix) {
         console.log(`${logPrefix} Task ${task.id} published successfully`);
       }
+    } else if (result.draftSaved) {
+      // Article was saved as a draft on the platform (not actually published).
+      // Mark with draft_saved status so the user knows content is on the
+      // platform but needs manual publishing action.
+      db.publish.updatePublishTask(task.id, {
+        status: 'draft_saved',
+        platformPostId: result.postId,
+        platformPostUrl: result.postUrl,
+        errorMessage: result.error || 'Article saved as draft only, not published',
+        failureType: 'draft_saved',
+      });
+      const articleUpdate: Partial<Article> = { status: 'draft_saved' };
+      if (result.postUrl) {
+        articleUpdate.publishUrl = result.postUrl;
+      }
+      db.articles.updateArticle(article.id, articleUpdate);
+      if (logPrefix) {
+        console.warn(`${logPrefix} Task ${task.id} saved as draft only (not published)`);
+      }
     } else {
       const error = result.error ?? 'Unknown publish error';
       const analysis = classifyFailure(error);

@@ -13,6 +13,7 @@ import type {
 } from '@zemingengine/shared';
 import type { DatabaseAccess } from '../db.js';
 import { executePublishWithHandling } from '../publish-utils.js';
+import { appendContactFooter } from '../article-footer.js';
 
 const MAX_ROUNDS = 3;
 
@@ -207,6 +208,7 @@ export function createPipelineRoutes(db: DatabaseAccess): Hono {
         approved: summaries.filter((a) => a.status === 'approved').length,
         publishing: summaries.filter((a) => a.status === 'publishing').length,
         published: summaries.filter((a) => a.status === 'published').length,
+        draft_saved: summaries.filter((a) => a.status === 'draft_saved').length,
         failed: summaries.filter((a) => a.status === 'failed').length,
         articles: summaries,
         run: latestRun,
@@ -286,6 +288,8 @@ async function generateArticleWithRetry(
       session,
     );
 
+    // Append enterprise contact info to article footer
+    result.article = appendContactFooter(result.article, session.enterprise);
     db.articles.insertArticle(result.article);
     latestArticle = result.article;
 
@@ -298,6 +302,13 @@ async function generateArticleWithRetry(
     }
 
     db.articles.updateArticle(result.article.id, { status: 'reviewing' });
+  }
+
+  // All rounds exhausted — mark as manual_edit instead of leaving in reviewing
+  // (consistent with POST /api/review/:articleId behavior)
+  if (latestArticle) {
+    db.articles.updateArticle(latestArticle.id, { status: 'manual_edit' });
+    return db.articles.getArticle(latestArticle.id);
   }
 
   return latestArticle;

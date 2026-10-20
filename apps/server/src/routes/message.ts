@@ -71,9 +71,15 @@ messageRoutes.post('/:id/profile-review', async (c) => {
       scale: body.scale.trim(),
       location: body.location.trim(),
       website: body.website.trim(),
+      foundedYear: body.foundedYear?.trim() || entry.engine.getSession().enterprise.foundedYear,
+      phone: body.phone?.trim() || '',
+      email: body.email?.trim() || '',
+      address: body.address?.trim() || '',
       products,
       brandStory: body.brandStory.trim(),
       trustAnchors: splitList(body.trustAnchorsText),
+      brandTone: body.brandToneText ? splitList(body.brandToneText) : entry.engine.getSession().enterprise.brandTone,
+      userPainPoints: body.userPainPointsText ? splitList(body.userPainPointsText) : entry.engine.getSession().enterprise.userPainPoints,
     },
   };
 

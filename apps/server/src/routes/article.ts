@@ -3,6 +3,7 @@ import { ContentGenerator } from '@zemingengine/content-generator';
 import { ContentReviewer } from '@zemingengine/content-reviewer';
 import type { Article, ArticleStatus, GenerateArticleRequest } from '@zemingengine/shared';
 import type { DatabaseAccess } from '../db.js';
+import { appendContactFooter } from '../article-footer.js';
 
 export function createArticleRoutes(db: DatabaseAccess): Hono {
   const app = new Hono();
@@ -31,6 +32,8 @@ export function createArticleRoutes(db: DatabaseAccess): Hono {
         session,
       );
 
+      // Append enterprise contact info to article footer
+      result.article = appendContactFooter(result.article, session.enterprise);
       db.articles.insertArticle(result.article);
 
       // Auto-review and regenerate if not passed (up to 3 rounds)
@@ -56,6 +59,8 @@ export function createArticleRoutes(db: DatabaseAccess): Hono {
           session,
         );
 
+        // Append enterprise contact info to regenerated article too
+        regenResult.article = appendContactFooter(regenResult.article, session.enterprise);
         db.articles.insertArticle(regenResult.article);
         review = reviewer.review(regenResult.article, session);
         db.reviews.insertReview(review);

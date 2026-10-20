@@ -34,6 +34,98 @@ export interface AiInfo {
   model: string;
 }
 
+// === Profile types ===
+
+export interface ProfileInfo {
+  platform: string;
+  accountName: string;
+  sizeBytes: number;
+  sizeMB: number;
+}
+
+export interface ProfileHealthInfo {
+  success: boolean;
+  platform: string;
+  account: string;
+  loggedIn: boolean;
+  url?: string;
+  authCookies?: boolean;
+  sizeBytes?: number;
+  sizeMB?: number;
+  error?: string;
+}
+
+export interface ProfileRenewResult {
+  success: boolean;
+  platform: string;
+  account: string;
+  loggedIn: boolean;
+  error?: string;
+}
+
+// === Node Management types ===
+
+export type NodeStatus = 'online' | 'offline' | 'deploying';
+
+export interface NodeInfo {
+  nodeId: string;
+  name: string;
+  endpoint: string;
+  version: string;
+  status: NodeStatus;
+  tags: string[];
+  platformCount: number;
+  activeSessions: number;
+  os: string;
+  cpuCores: number;
+  memoryMB: number;
+  registeredAt: string;
+  lastHeartbeatAt: string;
+  lastDeployAt?: string;
+  lastDeployStatus?: 'success' | 'failed';
+  ipAddress?: string;
+}
+
+export type DeployTaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'cancelled';
+
+export interface DeployTaskInfo {
+  taskId: string;
+  nodeId: string;
+  targetVersion?: string;
+  status: DeployTaskStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMs?: number;
+  error?: string;
+}
+
+export interface DeployBatchInfo {
+  batchId: string;
+  name: string;
+  targetVersion?: string;
+  nodeIds: string[];
+  status: DeployTaskStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  createdBy?: string;
+}
+
+export interface RenewAllResult {
+  total: number;
+  renewed: number;
+  stillLoggedIn: number;
+  failed: number;
+  results: Array<{
+    platform: string;
+    accountName: string;
+    success: boolean;
+    loggedIn: boolean;
+    error?: string;
+  }>;
+}
+
 const BASE_URL = '/api';
 
 /** API 业务错误（后端返回 success:false 或 HTTP 错误），区别于网络错误 */
@@ -86,6 +178,37 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   }
 
   return json.data as T;
+}
+
+/**
+ * 直接返回整个 JSON 响应，不经过 data 字段提取。
+ * 用于那些返回格式不是 { success, data } 的 API（如直接代理 harvester 的 endpoints）。
+ */
+export async function requestRaw<T extends { success: boolean }>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> {
+  const apiKey = getApiKey();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['x-api-key'] = apiKey;
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers: { ...headers, ...(options?.headers as Record<string, string>) },
+    });
+  } catch {
+    throw new Error('无法连接后端服务，请确认 API 服务已启动');
+  }
+
+  const json = (await res.json()) as T;
+  if (!res.ok || !json.success) {
+    const err = (json as any).error ?? `Request failed (${res.status})`;
+    throw new ApiError(err, res.status);
+  }
+
+  return json;
 }
 
 /**
@@ -260,4 +383,62 @@ export const api = {
 
   getAiInfo: () =>
     request<AiInfo>('/monitor/ai-info'),
+
+  // === Profiles (persistent browser profiles) ===
+
+  listProfiles: () =>
+    requestRaw<{ total: number; profiles: ProfileInfo[] }>('/profiles').then(
+      (data) => data.profiles,
+    ),
+
+  checkProfileHealth: (platform: string, accountName: string) =>
+    requestRaw<ProfileHealthInfo>(
+      `/profiles/${encodeURIComponent(platform)}/${encodeURIComponent(accountName)}/health`,
+    ),
+
+  deleteProfile: (platform: string, accountName: string) =>
+    requestRaw<{ success: boolean; deleted: boolean }>(
+      `/profiles/${encodeURIComponent(platform)}/${encodeURIComponent(accountName)}`,
+      { method: 'DELETE' },
+    ),
+
+  renewProfile: (platform: string, accountName: string) =>
+    requestRaw<ProfileRenewResult>(
+      `/profiles/${encodeURIComponent(platform)}/${encodeURIComponent(accountName)}/renew`,
+      { method: 'POST' },
+    ),
+
+  renewAllProfiles: () =>
+    requestRaw<RenewAllResult>('/profiles/renew-all', { method: 'POST' }),
+
+  // === Node Management (cloud deployment) ===
+
+  listNodes: () =>
+    requestRaw<{ total: number; nodes: NodeInfo[] }>('/nodes').then((d) => d.nodes),
+
+  getNodesSummary: () =>
+    requestRaw<{ total: number; online: number; offline: number; deploying: number; totalPlatforms: number }>(
+      '/nodes/summary',
+    ),
+
+  createDeployBatch: (nodeIds: string[], name?: string, targetVersion?: string) =>
+    requestRaw<{ batch: DeployBatchInfo }>('/nodes/deploy/batch', {
+      method: 'POST',
+      body: JSON.stringify({ nodeIds, name, targetVersion }),
+    }),
+
+  listDeployBatches: (limit = 20) =>
+    requestRaw<{ batches: DeployBatchInfo[] }>(`/nodes/deploy/batches?limit=${limit}`).then((d) => d.batches),
+
+  getDeployBatch: (batchId: string) =>
+    requestRaw<{ batch: DeployBatchInfo; tasks: DeployTaskInfo[] }>(`/nodes/deploy/batches/${batchId}`),
+
+  cancelDeployBatch: (batchId: string) =>
+    requestRaw<{ success: boolean }>(`/nodes/deploy/batches/${batchId}/cancel`, { method: 'POST' }),
+
+  getDeployTaskLog: (taskId: string) =>
+    requestRaw<{ taskId: string; status: string; log: string[] }>(`/nodes/deploy/tasks/${taskId}/log`),
+
+  getNodeDeployHistory: (nodeId: string, limit = 10) =>
+    requestRaw<{ tasks: DeployTaskInfo[] }>(`/nodes/${nodeId}/deploy/tasks?limit=${limit}`).then((d) => d.tasks),
 };

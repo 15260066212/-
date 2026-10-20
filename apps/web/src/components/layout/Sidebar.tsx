@@ -8,9 +8,11 @@ import {
   X,
   Target,
   Radar,
+  ShieldCheck,
+  Server,
 } from 'lucide-react';
 
-export type NavKey = 'chat' | 'plan' | 'content' | 'pipeline' | 'accounts' | 'monitor' | 'competitor';
+export type NavKey = 'chat' | 'plan' | 'content' | 'pipeline' | 'accounts' | 'profiles' | 'nodes' | 'monitor' | 'competitor';
 
 interface NavItem {
   key: NavKey;
@@ -24,6 +26,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'content', label: '内容管理', icon: FolderOpen },
   { key: 'pipeline', label: '流水线', icon: Send },
   { key: 'accounts', label: '账号管理', icon: Key },
+  { key: 'profiles', label: 'Profile 管理', icon: ShieldCheck },
+  { key: 'nodes', label: '节点管理', icon: Server },
   { key: 'competitor', label: '竞品监测', icon: Radar },
   { key: 'monitor', label: '运营监控', icon: BarChart3 },
 ];

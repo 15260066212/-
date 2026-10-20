@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Publisher, classifyFailure } from '@zemingengine/publisher';
-import { PLATFORM_NAMES } from '@zemingengine/shared';
+import { getPlatformLabel } from '@zemingengine/shared';
 import type {
   Article,
   PlatformCredentials,
@@ -57,7 +57,7 @@ export function createPublishRoutes(db: DatabaseAccess, publisher: Publisher): H
         });
 
         if (result.success === false) {
-          const displayName = PLATFORM_NAMES[platform] || platform;
+          const displayName = getPlatformLabel(platform);
           return c.json(
             { success: false, error: result.reason.replace(platform, displayName) },
             400,
@@ -251,7 +251,7 @@ export function createPublishRoutes(db: DatabaseAccess, publisher: Publisher): H
       const accountId = task.accountId ?? 'default';
       const credentials = db.credentials.getCredential(task.platform, task.userId ?? 'user_default', accountId);
       if (!credentials) {
-        const displayName = PLATFORM_NAMES[task.platform] || task.platform;
+        const displayName = getPlatformLabel(task.platform);
         return c.json({ success: false, error: `${displayName}平台Cookie未采集，请先在「账号管理」中采集Cookie后再发布` }, 404);
       }
 

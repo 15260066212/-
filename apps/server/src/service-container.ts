@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
+import { serveStatic } from '@hono/node-server/serve-static';
+import { resolve } from 'node:path';
 import { Publisher, RPAEngine } from '@zemingengine/publisher';
 import type { PublishLog } from '@zemingengine/shared';
 import { isAIAvailable } from '@zemingengine/ai-engine';
@@ -21,11 +23,14 @@ import { createPublishRoutes } from './routes/publish.js';
 import { createPipelineRoutes } from './routes/pipeline.js';
 import { createCredentialRoutes } from './routes/credentials.js';
 import { createCookieHarvesterRoutes } from './routes/cookie-harvester.js';
+import { createProfileRoutes } from './routes/profiles.js';
 import { createMonitorRoutes } from './routes/monitor.js';
 import { createCompetitorMonitorRoutes } from './routes/competitor-monitor.js';
 import { createOptimizationPlanRoutes } from './routes/optimization-plan.js';
 import { createUserRoutes } from './routes/user.js';
 import { createAuthRoutes } from './routes/auth.js';
+import { createNodeRoutes } from './routes/nodes.js';
+import { NodeRegistry } from './node-registry.js';
 
 export interface ServiceContainer {
   db: CachedDatabaseAccess;
@@ -41,6 +46,9 @@ export interface ServiceContainer {
 export function createServices(): ServiceContainer {
   const db = CachedDatabaseAccess.create();
   const app = new Hono<AppEnv>();
+
+  // Node registry (cloud deployment control)
+  const nodeRegistry = new NodeRegistry();
 
   app.use('*', logger());
 
@@ -77,8 +85,8 @@ export function createServices(): ServiceContainer {
     };
     try {
       db.publish.insertPublishLog(log);
-    } catch {
-      // Logging should never break the publish flow
+    } catch (err) {
+      console.warn('[ServiceContainer] Failed to insert publish log (non-critical)', { error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -132,8 +140,18 @@ export function createServices(): ServiceContainer {
   app.route('/api/pipeline', createPipelineRoutes(db));
   app.route('/api/credentials', createCredentialRoutes(db));
   app.route('/api/cookie-harvester', createCookieHarvesterRoutes(db));
+  app.route('/api/profiles', createProfileRoutes(db));
+  app.route('/api/nodes', createNodeRoutes(nodeRegistry));
   app.route('/api/competitor-monitor', createCompetitorMonitorRoutes());
   app.route('/api/optimization', createOptimizationPlanRoutes(db));
+
+  const webDist = resolve(import.meta.dirname, '../../web/dist');
+  app.use('/*', async (c, next) => {
+    await next();
+    c.res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  });
+  app.use('/*', serveStatic({ root: webDist }));
+  app.get('/*', (c) => c.header('Cache-Control', 'no-store, no-cache, must-revalidate'), serveStatic({ path: `${webDist}/index.html` }));
 
   return { db, app, publisher, sessionPool, reloginManager, selectorMonitor, captchaManager };
 }

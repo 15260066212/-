@@ -16,9 +16,12 @@ const PLATFORM_MAP: Record<PlatformId, string> = {
   sohu: 'sohuhao',
   netease: 'wangyihao',
   zhidao: 'zhidao',
+  baike: 'baike',
 };
 
-const HARVESTER_URL = process.env.HARVESTER_URL || 'http://localhost:3003';
+function getHarvesterUrl(): string {
+  return process.env.HARVESTER_URL || 'http://harvester:3003';
+}
 
 export function createCookieHarvesterRoutes(db: DatabaseAccess): Hono {
   const app = new Hono();
@@ -28,7 +31,7 @@ export function createCookieHarvesterRoutes(db: DatabaseAccess): Hono {
    */
   app.get('/platforms', async (c) => {
     try {
-      const resp = await fetch(`${HARVESTER_URL}/api/platforms`);
+      const resp = await fetch(`${getHarvesterUrl()}/api/platforms`);
       if (!resp.ok) {
         return c.json({ success: false, error: 'Harvester service unavailable' }, 502);
       }
@@ -51,7 +54,7 @@ export function createCookieHarvesterRoutes(db: DatabaseAccess): Hono {
       }
 
       const harvesterPlatform = PLATFORM_MAP[platform];
-      const resp = await fetch(`${HARVESTER_URL}/api/session/start`, {
+      const resp = await fetch(`${getHarvesterUrl()}/api/session/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ platform: harvesterPlatform }),
@@ -76,7 +79,7 @@ export function createCookieHarvesterRoutes(db: DatabaseAccess): Hono {
   app.get('/status/:sessionId', async (c) => {
     try {
       const sessionId = c.req.param('sessionId');
-      const resp = await fetch(`${HARVESTER_URL}/api/session/${sessionId}/status`);
+      const resp = await fetch(`${getHarvesterUrl()}/api/session/${sessionId}/status`);
       if (!resp.ok) {
         return c.json({ success: false, error: 'Session not found' }, 404);
       }
@@ -100,7 +103,7 @@ export function createCookieHarvesterRoutes(db: DatabaseAccess): Hono {
       const brandId = brandIdStr ? Number(brandIdStr) : undefined;
       const accountName = c.req.query('accountName');
 
-      const resp = await fetch(`${HARVESTER_URL}/api/session/${sessionId}/cookies`);
+      const resp = await fetch(`${getHarvesterUrl()}/api/session/${sessionId}/cookies`);
       if (!resp.ok) {
         return c.json({ success: false, error: 'Session not found' }, 404);
       }
@@ -125,6 +128,9 @@ export function createCookieHarvesterRoutes(db: DatabaseAccess): Hono {
           savedToCredentials: true,
           savedPlatform: platform,
           savedAccountId: accountId,
+          // Profile auto-save info (harvester saves session profile automatically)
+          profileSaved: data.profileSaved ?? false,
+          profilePath: data.profilePath ?? null,
         });
       }
 
@@ -141,7 +147,7 @@ export function createCookieHarvesterRoutes(db: DatabaseAccess): Hono {
   app.post('/close/:sessionId', async (c) => {
     try {
       const sessionId = c.req.param('sessionId');
-      const resp = await fetch(`${HARVESTER_URL}/api/session/${sessionId}/close`, {
+      const resp = await fetch(`${getHarvesterUrl()}/api/session/${sessionId}/close`, {
         method: 'POST',
       });
       if (!resp.ok) {
@@ -159,7 +165,7 @@ export function createCookieHarvesterRoutes(db: DatabaseAccess): Hono {
    */
   app.get('/sessions', async (c) => {
     try {
-      const resp = await fetch(`${HARVESTER_URL}/api/sessions`);
+      const resp = await fetch(`${getHarvesterUrl()}/api/sessions`);
       if (!resp.ok) {
         return c.json({ success: false, error: 'Harvester service unavailable' }, 502);
       }
@@ -175,13 +181,14 @@ export function createCookieHarvesterRoutes(db: DatabaseAccess): Hono {
    */
   app.get('/health', async (c) => {
     try {
-      const resp = await fetch(`${HARVESTER_URL}/health`);
+      const resp = await fetch(`${getHarvesterUrl()}/health`);
       if (!resp.ok) {
         return c.json({ success: false, status: 'unhealthy' }, 502);
       }
       const data = await resp.json();
       return c.json(data);
-    } catch {
+    } catch (err) {
+      console.error('[cookie-harvester] health check failed:', getHarvesterUrl(), err instanceof Error ? err.message : err);
       return c.json({ success: false, status: 'unreachable' }, 502);
     }
   });

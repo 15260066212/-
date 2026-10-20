@@ -29,6 +29,10 @@ const STATUS_CONFIG: Record<ArticleStatus, { label: string; className: string }>
     label: '失败',
     className: 'bg-error-bg text-error',
   },
+  draft_saved: {
+    label: '仅存草稿',
+    className: 'bg-amber-100 text-amber-700 border border-amber-300',
+  },
   manual_edit: {
     label: '待人工改写',
     className: 'bg-orange-100 text-orange-700 border border-orange-300',

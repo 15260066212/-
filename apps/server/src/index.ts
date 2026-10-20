@@ -54,7 +54,7 @@ async function executePlanTask(db: DatabaseAccess, task: any): Promise<void> {
     return;
   }
 
-  const generator = new ContentGenerator({ fallbackMode: true });
+  const generator = new ContentGenerator();
   const reviewer = new ContentReviewer();
 
   const result = await generator.generate({

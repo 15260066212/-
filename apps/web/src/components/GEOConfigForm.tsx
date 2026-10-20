@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import type { ProfileReviewRequest, SessionData } from '@zemingengine/shared';
 import { useSessionStore } from '../stores/sessionStore.js';
-import { Building2, Link2, FileText, Package, Award, Globe, MapPin, Users, Calendar, Sparkles, Save, RefreshCw, CheckCircle2, Upload, FileSpreadsheet } from 'lucide-react';
+import { Building2, Link2, FileText, Package, Award, Globe, MapPin, Users, Calendar, Sparkles, Save, RefreshCw, CheckCircle2, Upload, FileSpreadsheet, Phone, Mail } from 'lucide-react';
 
 interface Props {
   sessionData: SessionData;
@@ -14,6 +14,7 @@ export function GEOConfigForm({ sessionData }: Props) {
   const [savedFields, setSavedFields] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
+  const skipNextSync = useRef(false);
 
   const initial = useMemo(() => {
     const enterprise = sessionData.enterprise;
@@ -24,6 +25,9 @@ export function GEOConfigForm({ sessionData }: Props) {
       scale: enterprise.scale,
       location: enterprise.location,
       website: enterprise.website,
+      phone: enterprise.phone || '',
+      email: enterprise.email || '',
+      address: enterprise.address || '',
       foundedYear: enterprise.foundedYear,
       productsText: enterprise.products.map((product) => product.name).join('\n'),
       brandStory: enterprise.brandStory,
@@ -33,10 +37,15 @@ export function GEOConfigForm({ sessionData }: Props) {
     };
   }, [sessionData]);
 
-  const [form, setForm] = useState<ProfileReviewRequest & { foundedYear?: string; brandToneText?: string; userPainPointsText?: string }>(initial);
+  const [form, setForm] = useState<ProfileReviewRequest & { foundedYear?: string; brandToneText?: string; userPainPointsText?: string; phone?: string; email?: string; address?: string }>(initial);
 
   // Sync form state when sessionData changes (e.g., after URL auto-fill or PPT import)
+  // Skip sync after save to preserve user input
   useEffect(() => {
+    if (skipNextSync.current) {
+      skipNextSync.current = false;
+      return;
+    }
     setForm({
       fullName: sessionData.enterprise.fullName,
       shortName: sessionData.enterprise.shortName,
@@ -44,6 +53,9 @@ export function GEOConfigForm({ sessionData }: Props) {
       scale: sessionData.enterprise.scale,
       location: sessionData.enterprise.location,
       website: sessionData.enterprise.website,
+      phone: sessionData.enterprise.phone || '',
+      email: sessionData.enterprise.email || '',
+      address: sessionData.enterprise.address || '',
       foundedYear: sessionData.enterprise.foundedYear,
       productsText: sessionData.enterprise.products.map((p) => p.name).join('\n'),
       brandStory: sessionData.enterprise.brandStory,
@@ -94,6 +106,7 @@ export function GEOConfigForm({ sessionData }: Props) {
   };
 
   const handleSave = () => {
+    skipNextSync.current = true;
     confirmProfileReview(form);
     setSavedFields(new Set(Object.keys(form).filter((k) => form[k as keyof typeof form]?.trim())));
   };
@@ -215,6 +228,30 @@ export function GEOConfigForm({ sessionData }: Props) {
                   value={form.website}
                   onChange={(v) => update('website', v)}
                   placeholder="https://..."
+                />
+              </div>
+              <div className="grid gap-5 md:grid-cols-3">
+                <FormField
+                  label="联系电话"
+                  icon={Phone}
+                  value={form.phone ?? ''}
+                  onChange={(v) => update('phone', v)}
+                  placeholder="例如：400-xxx-xxxx"
+                  hint="将出现在文章末尾联系方式中"
+                />
+                <FormField
+                  label="联系邮箱"
+                  icon={Mail}
+                  value={form.email ?? ''}
+                  onChange={(v) => update('email', v)}
+                  placeholder="例如：contact@example.com"
+                />
+                <FormField
+                  label="公司地址"
+                  icon={MapPin}
+                  value={form.address ?? ''}
+                  onChange={(v) => update('address', v)}
+                  placeholder="例如：北京市朝阳区xxx"
                 />
               </div>
               <div className="grid gap-5 md:grid-cols-3">

@@ -405,7 +405,7 @@ export function PipelineProgress({ status, isRunning, runId, sessionId, onCancel
             </div>
             <div className="text-xs text-muted-foreground space-y-0.5">
               <div>总文章数：{run.totalArticles} 篇</div>
-              <div>已发布：{status?.published ?? 0} 篇 · 失败：{status?.failed ?? 0} 篇</div>
+              <div>已发布：{status?.published ?? 0} 篇 · 仅存草稿：{status?.draft_saved ?? 0} 篇 · 失败：{status?.failed ?? 0} 篇</div>
               {run.completedAt && (
                 <div>完成时间：{new Date(run.completedAt).toLocaleString('zh-CN')}</div>
               )}
