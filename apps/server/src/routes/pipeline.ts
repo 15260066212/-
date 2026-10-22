@@ -13,6 +13,7 @@ import type {
 } from '@zemingengine/shared';
 import type { DatabaseAccess } from '../db.js';
 import { executePublishWithHandling } from '../publish-utils.js';
+import { appendContactFooter } from '../article-footer.js';
 
 const MAX_ROUNDS = 3;
 
@@ -48,8 +49,8 @@ export function createPipelineRoutes(db: DatabaseAccess): Hono {
     };
     try {
       db.publish.insertPublishLog(log);
-    } catch {
-      // Logging should never break the publish flow
+    } catch (err) {
+      console.warn('[Pipeline] Failed to insert publish log (non-critical)', { error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -63,7 +64,9 @@ export function createPipelineRoutes(db: DatabaseAccess): Hono {
       }
 
       const articlesPerPlatform = getArticlesPerPlatform(body.planDuration);
-      const totalArticles = body.planArticles?.length || (body.platforms.length * articlesPerPlatform);
+      const planned = body.planArticles?.length || (body.platforms.length * articlesPerPlatform);
+      const cap = resolveMaxArticlesCap(body);
+      const totalArticles = cap !== undefined ? Math.min(planned, cap) : planned;
 
       // Create pipeline run record
       const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -207,6 +210,7 @@ export function createPipelineRoutes(db: DatabaseAccess): Hono {
         approved: summaries.filter((a) => a.status === 'approved').length,
         publishing: summaries.filter((a) => a.status === 'publishing').length,
         published: summaries.filter((a) => a.status === 'published').length,
+        draft_saved: summaries.filter((a) => a.status === 'draft_saved').length,
         failed: summaries.filter((a) => a.status === 'failed').length,
         articles: summaries,
         run: latestRun,
@@ -256,15 +260,13 @@ async function generateArticleWithRetry(
   runState: { cancelled: boolean },
 ): Promise<Article | undefined> {
   let latestArticle: Article | undefined;
+  let finalReview: ReturnType<ContentReviewer['review']> | undefined;
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
-    if (runState.cancelled) return latestArticle;
+    if (runState.cancelled) return undefined;
 
-    const reviewFeedback = latestArticle
-      ? (() => {
-          const r = reviewer.review(latestArticle, session);
-          return { issues: r.issues, suggestions: r.suggestions, overallScore: r.overallScore };
-        })()
+    const reviewFeedback = finalReview
+      ? { issues: finalReview.issues, suggestions: finalReview.suggestions, overallScore: finalReview.overallScore }
       : undefined;
 
     const supplementedKeywords = pipelineKeywords.get(request.sessionId) ?? [];
@@ -286,21 +288,26 @@ async function generateArticleWithRetry(
       session,
     );
 
-    db.articles.insertArticle(result.article);
+    // Append enterprise contact info to article footer
+    result.article = appendContactFooter(result.article, session.enterprise);
     latestArticle = result.article;
+    finalReview = reviewer.review(result.article, session);
 
-    const review = reviewer.review(result.article, session);
-    db.reviews.insertReview(review);
-
-    if (review.passed) {
-      db.articles.updateArticle(result.article.id, { status: 'approved' });
-      return db.articles.getArticle(result.article.id);
-    }
-
-    db.articles.updateArticle(result.article.id, { status: 'reviewing' });
+    if (finalReview.passed) break;
   }
 
-  return latestArticle;
+  // Persist only the final round — intermediate retry rounds are NOT inserted,
+  // otherwise one logical article produces N duplicate rows and inflates stats.
+  if (latestArticle && finalReview) {
+    db.articles.insertArticle(latestArticle);
+    db.reviews.insertReview(finalReview);
+    db.articles.updateArticle(latestArticle.id, {
+      status: finalReview.passed ? 'approved' : 'manual_edit',
+    });
+    return db.articles.getArticle(latestArticle.id);
+  }
+
+  return undefined;
 }
 
 /**
@@ -324,7 +331,7 @@ async function executePipeline(
   }
 
   const articlesPerPlatform = getArticlesPerPlatform(request.planDuration);
-  const articleList = buildArticleList(request, articlesPerPlatform);
+  const articleList = buildArticleList(request, articlesPerPlatform).slice(0, resolveMaxArticlesCap(request));
   let completed = 0;
 
   try {
@@ -372,13 +379,23 @@ async function executePipeline(
   }
 }
 
+const ARTICLES_PER_PLATFORM: Record<string, number> = {
+  year: 1200,
+  'half-year': 400,
+  quarter: 160,
+};
+
 function getArticlesPerPlatform(duration?: string): number {
-  switch (duration) {
-    case 'year': return 1200;
-    case 'half-year': return 400;
-    case 'quarter': return 160;
-    default: return 1;
+  return duration ? (ARTICLES_PER_PLATFORM[duration] ?? 1) : 1;
+}
+
+/** Resolve request.maxArticles into a slice cap (undefined = no cap). */
+function resolveMaxArticlesCap(request: PipelineRequest): number | undefined {
+  const max = request.maxArticles;
+  if (typeof max === 'number' && Number.isFinite(max) && max >= 1) {
+    return Math.floor(max);
   }
+  return undefined;
 }
 
 // 流水线内部的发布流程：使用 createTask + publishWithRetry

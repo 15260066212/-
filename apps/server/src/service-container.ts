@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
+import { serveStatic } from '@hono/node-server/serve-static';
+import { resolve } from 'node:path';
 import { Publisher, RPAEngine } from '@zemingengine/publisher';
 import type { PublishLog } from '@zemingengine/shared';
 import { isAIAvailable } from '@zemingengine/ai-engine';
@@ -21,11 +23,14 @@ import { createPublishRoutes } from './routes/publish.js';
 import { createPipelineRoutes } from './routes/pipeline.js';
 import { createCredentialRoutes } from './routes/credentials.js';
 import { createCookieHarvesterRoutes } from './routes/cookie-harvester.js';
+import { createProfileRoutes } from './routes/profiles.js';
 import { createMonitorRoutes } from './routes/monitor.js';
 import { createCompetitorMonitorRoutes } from './routes/competitor-monitor.js';
 import { createOptimizationPlanRoutes } from './routes/optimization-plan.js';
 import { createUserRoutes } from './routes/user.js';
 import { createAuthRoutes } from './routes/auth.js';
+import { createNodeRoutes } from './routes/nodes.js';
+import { NodeRegistry } from './node-registry.js';
 
 export interface ServiceContainer {
   db: CachedDatabaseAccess;
@@ -40,7 +45,12 @@ export interface ServiceContainer {
 /** Create and wire all services, mount routes, return the container. */
 export function createServices(): ServiceContainer {
   const db = CachedDatabaseAccess.create();
-  const app = new Hono<AppEnv>();
+  // strict: false 让 /foo 和 /foo/ 都能匹配到同一个路由
+  // 避免带尾部斜杠的请求落到静态文件中间件导致 500 错误
+  const app = new Hono<AppEnv>({ strict: false });
+
+  // Node registry (cloud deployment control)
+  const nodeRegistry = new NodeRegistry();
 
   app.use('*', logger());
 
@@ -77,8 +87,8 @@ export function createServices(): ServiceContainer {
     };
     try {
       db.publish.insertPublishLog(log);
-    } catch {
-      // Logging should never break the publish flow
+    } catch (err) {
+      console.warn('[ServiceContainer] Failed to insert publish log (non-critical)', { error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -127,13 +137,33 @@ export function createServices(): ServiceContainer {
   app.route('/api/session', createImportRoutes(db));
   app.route('/api/session', createManualRoutes(db));
   app.route('/api/articles', createArticleRoutes(db));
+  // 任务书规范端点别名：/api/article/* 与 /api/articles/* 同一处理器
+  app.route('/api/article', createArticleRoutes(db));
   app.route('/api/reviews', createReviewRoutes(db));
   app.route('/api/publish', createPublishRoutes(db, publisher));
   app.route('/api/pipeline', createPipelineRoutes(db));
   app.route('/api/credentials', createCredentialRoutes(db));
   app.route('/api/cookie-harvester', createCookieHarvesterRoutes(db));
+  app.route('/api/profiles', createProfileRoutes(db));
+  app.route('/api/nodes', createNodeRoutes(nodeRegistry));
   app.route('/api/competitor-monitor', createCompetitorMonitorRoutes());
   app.route('/api/optimization', createOptimizationPlanRoutes(db));
+  // 前端构建产物调用的是 /api/optimization-plan/*；缺这条别名会 404 返回纯文本，
+  // 前端 resp.json() 解析失败后统一提示"无法连接到服务器"。
+  app.route('/api/optimization-plan', createOptimizationPlanRoutes(db));
+
+  const webDist = resolve(import.meta.dirname, '../../web/dist');
+  app.use('/*', async (c, next) => {
+    await next();
+    try {
+      c.res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    } catch {
+      // 响应已中止或 status 非法时 @hono/node-server 构造 res 会抛
+      // RangeError（uncaught 直接杀进程导致 pm2 重启），这里吞掉仅跳过 header
+    }
+  });
+  app.use('/*', serveStatic({ root: webDist }));
+  app.get('/*', (c) => c.header('Cache-Control', 'no-store, no-cache, must-revalidate'), serveStatic({ path: `${webDist}/index.html` }));
 
   return { db, app, publisher, sessionPool, reloginManager, selectorMonitor, captchaManager };
 }
