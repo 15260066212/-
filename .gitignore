@@ -38,3 +38,51 @@ scripts-archive/
 # Large unrelated assets
 *.png
 !**/*.png.meta
+
+# ---------- Wechatsync bridge runtime artifacts (generated per-node, never commit) ----------
+harvester/data/wechatsync-profile/
+harvester/data/wechatsync-token.txt
+home/ubuntu/wechatsync-profile/
+home/ubuntu/geo-assistant-clean/data/wechatsync-profile/
+wechatsync-token.txt
+
+# ---------- Harvester runtime data (per-node credentials + cookies + profiles) ----------
+harvester/data/credentials.json
+harvester/data/browser-profiles/
+data/credentials.json
+data/browser-profiles/
+harvester/data/
+apps/data/geo-assistant.db*
+
+# ---------- PM2 / node runtime ----------
+.pm2/
+ecosystem.config.js.bak-*
+llmwiki_pipeline.js.bak-*
+harvester/routes/*.bak-*
+harvester/lib/*.bak-*
+
+# ---------- Debug / probe scripts (generated locally, never ship) ----------
+debug_*.js
+check_*.js
+probe-*.js
+/tmp/
+
+# ---------- Extension dist lives OUTSIDE the repo ----------
+# /home/ubuntu/wechatsync-ext is a node_modules-style artifact; tracked by
+# rsync, not git.
+
+# ---------- Debug / one-off scripts (generated locally, never ship) ----------
+batch_publish.js
+check-users.js
+check_*.js
+delete*.js
+debug_*.js
+
+# ---------- Backup build artifacts ----------
+*.backup.profile/
+dist.bak.*
+dist.backup.*
+
+# ---------- Per-node sqlite databases (credentials/accounts live here) ----------
+apps/server/data/
+data/
