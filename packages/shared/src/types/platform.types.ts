@@ -6,7 +6,8 @@
 export type PlatformId =
   | 'weixin' | 'zhihu' | 'toutiao'
   | 'csdn' | 'juejin'
-  | 'sohu' | 'netease' | 'baike';
+  | 'sohu' | 'netease' | 'baike'
+  | 'baijia' | 'bilibili' | 'zhidao';
 
 export interface PlatformStrategy {
   platform: string;

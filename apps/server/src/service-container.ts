@@ -53,9 +53,6 @@ export function createServices(): ServiceContainer {
   // Node registry (cloud deployment control)
   const nodeRegistry = new NodeRegistry();
 
-  // Node registry (cloud deployment control)
-  const nodeRegistry = new NodeRegistry();
-
   app.use('*', logger());
 
   const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:5174,http://127.0.0.1:5174')
@@ -167,14 +164,6 @@ export function createServices(): ServiceContainer {
       // 响应已中止或 status 非法时 @hono/node-server 构造 res 会抛
       // RangeError（uncaught 直接杀进程导致 pm2 重启），这里吞掉仅跳过 header
     }
-  });
-  app.use('/*', serveStatic({ root: webDist }));
-  app.get('/*', (c) => c.header('Cache-Control', 'no-store, no-cache, must-revalidate'), serveStatic({ path: `${webDist}/index.html` }));
-
-  const webDist = resolve(import.meta.dirname, '../../web/dist');
-  app.use('/*', async (c, next) => {
-    await next();
-    c.res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   });
   app.use('/*', serveStatic({ root: webDist }));
   app.get('/*', (c) => c.header('Cache-Control', 'no-store, no-cache, must-revalidate'), serveStatic({ path: `${webDist}/index.html` }));
