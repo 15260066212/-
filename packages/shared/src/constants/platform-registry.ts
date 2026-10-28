@@ -82,7 +82,7 @@ export interface PlatformInfo {
   capabilities: PlatformCapabilities;
 }
 
-const REGISTRY: Record<PlatformId, PlatformInfo> = {
+const REGISTRY: Partial<Record<PlatformId, PlatformInfo>> = {
   weixin: {
     id: 'weixin',
     label: '微信公众号',

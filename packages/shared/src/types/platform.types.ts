@@ -4,10 +4,9 @@
 
 /** Publishing platform IDs (actual content distribution platforms). */
 export type PlatformId =
-  | 'weixin' | 'zhihu' | 'toutiao'
-  | 'csdn' | 'juejin'
-  | 'sohu' | 'netease' | 'baike'
-  | 'baijia' | 'bilibili' | 'zhidao';
+  | 'weixin' | 'zhihu' | 'baijia' | 'toutiao'
+  | 'csdn' | 'juejin' | 'bilibili'
+  | 'sohu' | 'netease' | 'zhidao' | 'baike';
 
 export interface PlatformStrategy {
   platform: string;

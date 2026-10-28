@@ -5,7 +5,7 @@ import type { PlatformId } from '@zemingengine/shared';
 /**
  * Maps internal PlatformId to harvester service platform identifiers.
  */
-const PLATFORM_MAP: Record<PlatformId, string> = {
+const PLATFORM_MAP: Partial<Record<PlatformId, string>> = {
   weixin: 'wechat',
   zhihu: 'zhihu',
   toutiao: 'toutiaohao',
