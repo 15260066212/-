@@ -85,17 +85,17 @@ describe('Credentials API', () => {
 
     it('updates an existing credential', async () => {
       await request(app)
-        .put('/api/credentials/bilibili')
+        .put('/api/credentials/toutiaohao')
         .send({ type: 'cookie', data: { cookie: 'old=1' }, status: 'active' });
 
       const res = await request(app)
-        .put('/api/credentials/bilibili')
+        .put('/api/credentials/toutiaohao')
         .send({ type: 'cookie', data: { cookie: 'new=2' }, status: 'inactive' });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
 
-      const getRes = await request(app).get('/api/credentials/bilibili');
+      const getRes = await request(app).get('/api/credentials/toutiaohao');
       expect(getRes.body.data.status).toBe('inactive');
       expect(getRes.body.data.data.cookie).toBe('new=2');
     });

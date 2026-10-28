@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Publisher, classifyFailure } from '@zemingengine/publisher';
-import { PLATFORM_NAMES } from '@zemingengine/shared';
+import { getPlatformLabel } from '@zemingengine/shared';
 import type {
   Article,
   PlatformCredentials,
@@ -57,7 +57,7 @@ export function createPublishRoutes(db: DatabaseAccess, publisher: Publisher): H
         });
 
         if (result.success === false) {
-          const displayName = PLATFORM_NAMES[platform] || platform;
+          const displayName = getPlatformLabel(platform);
           return c.json(
             { success: false, error: result.reason.replace(platform, displayName) },
             400,
@@ -74,8 +74,9 @@ export function createPublishRoutes(db: DatabaseAccess, publisher: Publisher): H
         });
 
         db.publish.insertPublishTask(task);
+        // 草稿尚未在平台落盘，先标记为 publishing，等异步任务确认后再置 draft_saved
         db.articles.updateArticle(article.id, { status: 'publishing' });
-        void publishArticleAsync(db, publisher, task, article, credentials);
+        void saveDraftArticleAsync(db, publisher, task, article, credentials);
         tasks.push(task);
       }
 
@@ -191,9 +192,9 @@ export function createPublishRoutes(db: DatabaseAccess, publisher: Publisher): H
 
         const taskWithPriority = { ...task, priority };
         db.publish.insertPublishTask(taskWithPriority);
-        db.articles.updateArticle(article.id, { status: 'publishing' });
+        db.articles.updateArticle(article.id, { status: 'draft_saved' });
 
-        void publishArticleAsync(db, publisher, taskWithPriority, article, credentials);
+        void saveDraftArticleAsync(db, publisher, taskWithPriority, article, credentials);
         tasks.push(taskWithPriority);
       }
 
@@ -251,14 +252,14 @@ export function createPublishRoutes(db: DatabaseAccess, publisher: Publisher): H
       const accountId = task.accountId ?? 'default';
       const credentials = db.credentials.getCredential(task.platform, task.userId ?? 'user_default', accountId);
       if (!credentials) {
-        const displayName = PLATFORM_NAMES[task.platform] || task.platform;
+        const displayName = getPlatformLabel(task.platform);
         return c.json({ success: false, error: `${displayName}平台Cookie未采集，请先在「账号管理」中采集Cookie后再发布` }, 404);
       }
 
       db.publish.updatePublishTask(taskId, { status: 'retrying', errorMessage: undefined });
       const retryTask: PublishTask = { ...task, status: 'retrying' };
 
-      void publishArticleAsync(db, publisher, retryTask, article, credentials);
+      void saveDraftArticleAsync(db, publisher, retryTask, article, credentials);
 
       return c.json({ success: true, data: db.publish.getPublishTask(taskId) });
     } catch (error) {
@@ -295,6 +296,66 @@ export function createPublishRoutes(db: DatabaseAccess, publisher: Publisher): H
           taskId,
           verificationStatus: verification.verificationStatus,
           verificationMessage: verification.verificationMessage,
+        },
+      });
+    } catch (error) {
+      return c.json({ success: false, error: formatError(error) }, 500);
+    }
+  });
+
+  // POST /:taskId/confirm-published - 使用者手动在平台发布后，回到系统标记文章为已发布
+  app.post('/:taskId/confirm-published', async (c) => {
+    try {
+      const taskId = c.req.param('taskId');
+      const task = db.publish.getPublishTask(taskId);
+      if (!task) {
+        return c.json({ success: false, error: 'Publish task not found' }, 404);
+      }
+
+      // Only tasks currently in draft_saved state can be confirmed as published
+      if (task.status !== 'draft_saved') {
+        return c.json(
+          { success: false, error: `Cannot confirm task with status: ${task.status}. Expected 'draft_saved'.` },
+          400,
+        );
+      }
+
+      // Optional: user can provide the final published URL
+      let body: { postUrl?: string } = {};
+      try {
+        body = await c.req.json<{ postUrl?: string }>();
+      } catch {
+        body = {};
+      }
+      const publishedAt = new Date().toISOString();
+
+      const updates: Partial<PublishTask> = {
+        status: 'published',
+        publishedAt,
+      };
+      if (body.postUrl) {
+        updates.platformPostUrl = body.postUrl;
+      }
+
+      const article = db.articles.getArticle(task.articleId);
+
+      db.runInTransaction(() => {
+        db.publish.updatePublishTask(taskId, updates);
+        if (article) {
+          db.articles.updateArticle(article.id, {
+            status: 'published',
+            ...(body.postUrl ? { publishUrl: body.postUrl } : {}),
+          });
+        }
+      });
+
+      return c.json({
+        success: true,
+        data: {
+          taskId,
+          status: 'published',
+          publishedAt,
+          platformPostUrl: body.postUrl || task.platformPostUrl,
         },
       });
     } catch (error) {
@@ -401,6 +462,62 @@ async function publishArticleAsync(
   }
 }
 
+// 异步保存草稿：调用 saveDraftWithRetry，成功后任务与文章状态标记为 draft_saved
+// （草稿已保存到平台，等待使用者手动发布后通过 confirm-published 标记为已发布）
+async function saveDraftArticleAsync(
+  db: DatabaseAccess,
+  publisher: Publisher,
+  task: PublishTask,
+  article: Article,
+  credentials: PlatformCredentials,
+): Promise<void> {
+  try {
+    const result = await publisher.saveDraftWithRetry(
+      task,
+      article,
+      credentials,
+      (updates) => db.publish.updatePublishTask(task.id, updates),
+    );
+
+    if (result.success) {
+      const updates: Partial<PublishTask> = {
+        status: 'draft_saved',
+        platformPostId: result.postId,
+        platformPostUrl: result.postUrl,
+        verificationStatus: result.verificationStatus ?? 'draft_saved',
+        verificationMessage: result.verificationMessage,
+      };
+
+      db.runInTransaction(() => {
+        db.publish.updatePublishTask(task.id, updates);
+        db.articles.updateArticle(article.id, { status: 'draft_saved' });
+      });
+    } else {
+      const error = result.error ?? 'Unknown draft-save error';
+      const analysis = classifyFailure(error);
+      db.runInTransaction(() => {
+        db.publish.updatePublishTask(task.id, {
+          status: 'failed',
+          errorMessage: error,
+          failureType: analysis.type,
+        });
+        db.articles.updateArticle(article.id, { status: 'failed' });
+      });
+    }
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'Unknown error';
+    const analysis = classifyFailure(error);
+    db.runInTransaction(() => {
+      db.publish.updatePublishTask(task.id, {
+        status: 'failed',
+        errorMessage: error,
+        failureType: analysis.type,
+      });
+      db.articles.updateArticle(article.id, { status: 'failed' });
+    });
+  }
+}
+
 /**
  * Verify a published article's accessibility.
  *
@@ -420,8 +537,8 @@ async function verifyTaskPublication(
 }> {
   const adapter = publisher.getAdapter(task.platform);
 
-  // API platforms: use adapter-based verification
-  if (adapter && adapter.getMethod() === 'api') {
+  // API platforms: use adapter-based verification if the adapter supports it
+  if (adapter && adapter.getMethod() === 'api' && 'verifyWithCredentials' in adapter) {
     const accountId = task.accountId ?? 'default';
     const credentials = db.credentials.getCredential(task.platform, task.userId ?? 'user_default', accountId);
     if (!credentials) {
@@ -432,7 +549,7 @@ async function verifyTaskPublication(
     }
 
     try {
-      return await adapter.verifyWithCredentials(credentials, task.platformPostId);
+      return await (adapter as any).verifyWithCredentials(credentials, task.platformPostId);
     } catch (err) {
       return {
         verificationStatus: 'unverified',

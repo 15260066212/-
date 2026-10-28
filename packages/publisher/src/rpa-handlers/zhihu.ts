@@ -141,6 +141,109 @@ export class ZhihuRpaHandler extends RpaHandler {
     }
   }
 
+  /**
+   * Save the article as a Zhihu draft without publishing.
+   *
+   * Fills the title and content in the Zhihu editor, then clicks the
+   * "存草稿" / "保存草稿" button. The article remains in the Zhihu
+   * draft box until the user manually publishes it.
+   */
+  async saveDraft(page: Page, article: Article, credentials: PlatformCredentials): Promise<PublishResult> {
+    const domain = '.zhihu.com';
+    const cookies = this.parseCookies(credentials, domain);
+
+    if (cookies.length === 0) {
+      return { success: false, error: 'No cookies found in credentials for Zhihu' };
+    }
+
+    const hasAuthCookie = cookies.some((c) =>
+      c.name === 'z_c0' || c.name === 'q_c1' || c.name === 'unlock_ticket'
+    );
+    if (!hasAuthCookie) {
+      return { success: false, error: 'Missing auth cookie (z_c0/q_c1/unlock_ticket) - Zhihu authentication required' };
+    }
+
+    try {
+      // Navigate to main page first, then editor (same as publish)
+      try {
+        await page.goto('https://www.zhihu.com/', {
+          waitUntil: 'commit',
+          timeout: this.timeouts.PAGE_NAVIGATION,
+        });
+        await page.waitForTimeout(3000);
+      } catch {
+        // ignore
+      }
+
+      try {
+        await page.goto(getPlatformEditorUrl(this.platform)!, {
+          waitUntil: 'commit',
+          timeout: this.timeouts.PAGE_NAVIGATION,
+        });
+        await page.waitForTimeout(5000);
+      } catch {
+        // ignore
+      }
+
+      // Wait for title input
+      try {
+        await page.waitForSelector(
+          'textarea.ColumnWriteEditor-titleInput, input[placeholder*="标题"], textarea[placeholder*="标题"]',
+          { timeout: 15000 }
+        );
+      } catch {
+        await this.captureScreenshot(page, 'title_not_found');
+        return { success: false, error: 'Zhihu editor did not load — cookies may be expired' };
+      }
+
+      const currentUrl = page.url();
+      if (currentUrl.includes('sign') || currentUrl.includes('login')) {
+        await this.captureScreenshot(page, 'auth_failed');
+        return { success: false, error: 'Zhihu authentication failed - cookies may be expired' };
+      }
+
+      // Fill title
+      const titleFilled = await this.fillInput(page, 'textarea.ColumnWriteEditor-titleInput', article.title)
+        || await this.fillInput(page, 'input[placeholder*="标题"]', article.title);
+      if (!titleFilled) {
+        return { success: false, error: 'Failed to fill article title on Zhihu' };
+      }
+
+      // Fill content
+      const contentFilled = await this.fillRichTextEditor(page, article.contentMarkdown, ['.public-DraftEditor-content']);
+      if (!contentFilled) {
+        return { success: false, error: 'Failed to fill article content on Zhihu' };
+      }
+
+      // Click save-draft button
+      await page.waitForTimeout(this.timeouts.MEDIUM);
+      const draftClicked = await this.clickElement(page, 'button:has-text("存草稿")', this.timeouts.EXTENDED)
+        || await this.clickElement(page, 'button:has-text("保存草稿")', this.timeouts.DEFAULT);
+
+      if (!draftClicked) {
+        await this.captureScreenshot(page, 'draft_save_failed');
+        return { success: false, error: 'Failed to click save-draft button on Zhihu' };
+      }
+
+      await page.waitForTimeout(this.timeouts.EXTRA_LONG);
+
+      return {
+        success: true,
+        postId: `zhihu_${Date.now()}`,
+        postUrl: page.url(),
+        verificationStatus: 'draft_saved',
+        verificationMessage: 'Article saved to Zhihu draft box. Manual publication required.',
+        draftSaved: true,
+      };
+    } catch (err) {
+      await this.captureScreenshot(page, 'error');
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown Zhihu RPA error',
+      };
+    }
+  }
+
   private async addTopics(page: Page, tags: string[]): Promise<void> {
     try {
       // Click the "添加话题" button

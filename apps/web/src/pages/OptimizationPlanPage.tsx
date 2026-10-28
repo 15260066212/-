@@ -7,6 +7,7 @@ import type {
 import { usePipelineStore } from '../stores/pipelineStore.js';
 import { useSessionStore } from '../stores/sessionStore.js';
 import { generateOptimizationPlan, inferContentTypes, type OptimizationPlan } from '../utils/planGenerator.js';
+import { optimizationPlanPaths } from '../utils/api-paths.js';
 import {
   Calendar, Target, FileText, TrendingUp, Send,
   CheckCircle2, Clock, Sparkles, ArrowRight,
@@ -45,6 +46,12 @@ const CONTENT_TYPE_LABELS: Record<ArticleContentType, string> = {
   tutorial: '教程', case: '案例', comparison: '对比',
   popularization: '科普', faq: 'FAQ问答', whitepaper: '白皮书',
 };
+
+// === UI Constants ===
+/** Maximum character length for content supplement textarea */
+const MAX_SUPPLEMENT_TEXT_LENGTH = 1000;
+/** Character count threshold at which to show a warning for supplement text */
+const SUPPLEMENT_TEXT_WARNING_THRESHOLD = 900;
 
 export function OptimizationPlanPage({ sessionId, sessionData, onNavigate }: Props) {
   const { startPipeline, isRunning, error, clearError } = usePipelineStore();
@@ -91,7 +98,7 @@ export function OptimizationPlanPage({ sessionId, sessionData, onNavigate }: Pro
   useEffect(() => {
     if (!sessionId) return;
     const apiKey = localStorage.getItem('apiKey') || '';
-    fetch(`/api/optimization-plan/saved/${sessionId}`, {
+    fetch(optimizationPlanPaths.saved(sessionId), {
       headers: { 'x-api-key': apiKey },
     })
       .then((r) => r.json())
@@ -112,7 +119,7 @@ export function OptimizationPlanPage({ sessionId, sessionData, onNavigate }: Pro
     setGenError(null);
     try {
       const apiKey = localStorage.getItem('apiKey') || '';
-      const resp = await fetch('/api/optimization-plan/generate', {
+      const resp = await fetch(optimizationPlanPaths.generate, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
         body: JSON.stringify({
@@ -146,7 +153,7 @@ export function OptimizationPlanPage({ sessionId, sessionData, onNavigate }: Pro
     }
   };
 
-  const PUBLISH_PLATFORM_IDS = ['weixin', 'zhihu', 'baijia', 'toutiao', 'csdn', 'juejin', 'sohu', 'netease', 'zhidao'];
+  const PUBLISH_PLATFORM_IDS = ['weixin', 'zhihu', 'toutiao', 'csdn', 'juejin', 'sohu', 'netease'];
 
   const handleLaunchPipeline = () => {
     if (!plan || selectedPlatforms.size === 0 || isRunning) return;
@@ -427,13 +434,13 @@ export function OptimizationPlanPage({ sessionId, sessionData, onNavigate }: Pro
               value={supplementText}
               onChange={(e) => setSupplementText(e.target.value)}
               placeholder="例如：请在文章中加入品牌联系电话 13107869995，强调10年行业经验，提及免费咨询服务等..."
-              maxLength={1000}
+              maxLength={MAX_SUPPLEMENT_TEXT_LENGTH}
               rows={4}
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:ring-1 focus:ring-primary resize-y"
             />
             <div className="flex justify-end mt-1">
-              <span className={`text-xs ${supplementText.length >= 900 ? 'text-error' : 'text-muted-foreground'}`}>
-                {supplementText.length} / 1000
+              <span className={`text-xs ${supplementText.length >= SUPPLEMENT_TEXT_WARNING_THRESHOLD ? 'text-error' : 'text-muted-foreground'}`}>
+                {supplementText.length} / {MAX_SUPPLEMENT_TEXT_LENGTH}
               </span>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import type { PlatformCredentials, PlatformId } from '@zemingengine/shared';
+import type { PlatformId } from '@zemingengine/shared';
 import type { PublishParams, PublishResult } from '../types.js';
 
 export interface VerificationResult {
@@ -15,26 +15,22 @@ export abstract class PlatformAdapter {
 
   abstract publish(params: PublishParams): Promise<PublishResult>;
 
-  getMethod(): 'api' | 'rpa' {
-    return 'api';
+  /**
+   * Save the article as a draft on the platform without publishing it.
+   *
+   * The returned PublishResult should have `success: true`,
+   * `verificationStatus: 'draft_saved'`, and `draftSaved: true`.
+   * The `postId` holds the platform draft identifier (e.g. WeChat media_id).
+   *
+   * Default implementation falls back to `publish()` so that adapters
+   * without native draft support still produce a result (callers should
+   * inspect `draftSaved` to know whether a true draft was created).
+   */
+  async saveDraft(params: PublishParams): Promise<PublishResult> {
+    return this.publish(params);
   }
 
-  /**
-   * Verify that a published article is live and accessible.
-   * Default implementation returns 'unverified' — subclasses (e.g. WechatAdapter)
-   * override this to perform platform-specific API verification.
-   *
-   * @param credentials - Platform credentials needed for verification
-   * @param postId - The platform post ID (e.g. publish_id, media_id)
-   * @returns Verification result with status and message
-   */
-  async verifyWithCredentials(
-    _credentials: PlatformCredentials,
-    _postId?: string,
-  ): Promise<VerificationResult> {
-    return {
-      verificationStatus: 'unverified',
-      verificationMessage: 'Verification not supported for this platform',
-    };
+  getMethod(): 'api' | 'rpa' {
+    return 'api';
   }
 }

@@ -28,10 +28,11 @@ export const createOptimizationPlanRoutes = (db: DatabaseAccess) => {
       return c.json({ success: false, error: `AI生成失败：${result.error}` });
     }
 
-    const responseText = result.data?.choices?.[0]?.message?.content
-      || result.data?.output?.content
-      || result.data?.output?.[0]?.content?.[0]?.text
-      || JSON.stringify(result.data);
+    const data = result.data as any;
+    const responseText = data?.choices?.[0]?.message?.content
+      || data?.output?.content
+      || data?.output?.[0]?.content?.[0]?.text
+      || JSON.stringify(data);
 
     const contentHtml = markdownToHtml(responseText);
     const title = body.enterprise.shortName || body.enterprise.fullName || '企业';
@@ -392,7 +393,7 @@ function wrapFullHtml(title: string, contentHtml: string): string {
 }
 
 // Content publishing platforms — articles are published to these platforms, not AI monitoring platforms
-const PUBLISH_PLATFORMS = ['weixin', 'zhihu', 'baijia', 'toutiao', 'csdn', 'juejin', 'sohu', 'netease', 'zhidao'];
+const PUBLISH_PLATFORMS = ['weixin', 'zhihu', 'toutiao', 'csdn', 'juejin', 'sohu', 'netease'];
 
 function generatePlanArticles(req: PlanRequest): PlanArticle[] {
   const articles: PlanArticle[] = [];

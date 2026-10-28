@@ -39,32 +39,32 @@ afterEach(() => {
 describe('isAIAvailable', () => {
   it('returns false when OPENAI_API_KEY is not set', () => {
     delete process.env.OPENAI_API_KEY;
-    expect(isAIAvailable()).toBe(false);
+    expect(isAIAvailable()).toBe(false, 'should have correct isAIAvailable() when false when OPENAI_API_KEY is not set');
   });
 
   it('returns false when OPENAI_API_KEY is an empty string', () => {
     process.env.OPENAI_API_KEY = '';
-    expect(isAIAvailable()).toBe(false);
+    expect(isAIAvailable()).toBe(false, 'should have correct isAIAvailable() when false when OPENAI_API_KEY is an empty string');
   });
 
   it('returns false when OPENAI_API_KEY is the placeholder "sk-your-api-key-here"', () => {
     process.env.OPENAI_API_KEY = 'sk-your-api-key-here';
-    expect(isAIAvailable()).toBe(false);
+    expect(isAIAvailable()).toBe(false, 'should have correct isAIAvailable() when false when OPENAI_API_KEY is the placeholder');
   });
 
   it('returns false when OPENAI_API_KEY is the placeholder with mixed case', () => {
     process.env.OPENAI_API_KEY = 'SK-YOUR-API-KEY-HERE';
-    expect(isAIAvailable()).toBe(false);
+    expect(isAIAvailable()).toBe(false, 'should have correct isAIAvailable() when false when OPENAI_API_KEY is the placeholder with mixed case');
   });
 
   it('returns false when OPENAI_API_KEY is only whitespace', () => {
     process.env.OPENAI_API_KEY = '   ';
-    expect(isAIAvailable()).toBe(false);
+    expect(isAIAvailable()).toBe(false, 'should have correct isAIAvailable() when false when OPENAI_API_KEY is only whitespace');
   });
 
   it('returns true when a valid API key is set', () => {
     process.env.OPENAI_API_KEY = 'sk-valid-key-1234567890';
-    expect(isAIAvailable()).toBe(true);
+    expect(isAIAvailable()).toBe(true, 'should have correct isAIAvailable() when true when a valid API key is set');
   });
 });
 
@@ -77,31 +77,31 @@ describe('validateInput (basic validation, AI unavailable)', () => {
 
   it('rejects empty input', async () => {
     const result = await validateInput('fullName', '请输入企业全称', '', session);
-    expect(result.valid).toBe(false);
-    expect(result.feedback).toBe('输入不能为空，请填写后重试。');
+    expect(result.valid).toBe(false, 'should have correct valid flag when rejects empty input');
+    expect(result.feedback).toBe('输入不能为空，请填写后重试。', 'should have correct feedback message when rejects empty input');
   });
 
   it('rejects whitespace-only input', async () => {
     const result = await validateInput('fullName', '请输入企业全称', '   ', session);
-    expect(result.valid).toBe(false);
-    expect(result.feedback).toBe('输入不能为空，请填写后重试。');
+    expect(result.valid).toBe(false, 'should have correct valid flag when rejects whitespace-only input');
+    expect(result.feedback).toBe('输入不能为空，请填写后重试。', 'should have correct feedback message when rejects whitespace-only input');
   });
 
   it('rejects very short input (length < 2)', async () => {
     const result = await validateInput('fullName', '请输入企业全称', 'a', session);
-    expect(result.valid).toBe(false);
-    expect(result.feedback).toBe('输入太短，请提供更多细节。');
+    expect(result.valid).toBe(false, 'should have correct valid flag when rejects very short input (length < 2)');
+    expect(result.feedback).toBe('输入太短，请提供更多细节。', 'should have correct feedback message when rejects very short input (length < 2)');
   });
 
   it('rejects input of 1-3 random letters like "ab"', async () => {
     const result = await validateInput('fullName', '请输入企业全称', 'ab', session);
-    expect(result.valid).toBe(false);
-    expect(result.feedback).toBe('这看起来不像有效输入，请提供完整的内容。');
+    expect(result.valid).toBe(false, 'should have correct valid flag when rejects input of 1-3 random letters like');
+    expect(result.feedback).toBe('这看起来不像有效输入，请提供完整的内容。', 'should have correct feedback message when rejects input of 1-3 random letters like');
   });
 
   it('rejects input of 3 random letters like "xyz"', async () => {
     const result = await validateInput('fullName', '请输入企业全称', 'xyz', session);
-    expect(result.valid).toBe(false);
+    expect(result.valid).toBe(false, 'should have correct valid flag when rejects input of 3 random letters like');
     expect(result.feedback).toBe('这看起来不像有效输入，请提供完整的内容。');
   });
 

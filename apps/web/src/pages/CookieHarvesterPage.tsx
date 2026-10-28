@@ -1,25 +1,21 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { PlatformId } from '@zemingengine/shared';
+import { cookieHarvesterPaths } from '../utils/api-paths.js';
 
-const API_BASE = '/api/cookie-harvester';
-
-const PLATFORM_LABELS: Record<PlatformId, string> = {
+const PLATFORM_LABELS: Record<string, string> = {
   weixin: '微信公众号',
   zhihu: '知乎',
-  baijia: '百家号',
   toutiao: '今日头条',
   csdn: 'CSDN',
   juejin: '掘金',
-  bilibili: '哔哩哔哩',
   sohu: '搜狐号',
   netease: '网易号',
-  zhidao: '百度知道',
 };
 
 const ALL_PLATFORMS: PlatformId[] = [
-  'weixin', 'zhihu', 'baijia', 'toutiao',
-  'csdn', 'juejin', 'bilibili',
-  'sohu', 'netease', 'zhidao',
+  'weixin', 'zhihu', 'toutiao',
+  'csdn', 'juejin',
+  'sohu', 'netease',
 ];
 
 interface SessionInfo {
@@ -57,7 +53,7 @@ export function CookieHarvesterPage() {
   // Check harvester health on mount
   const checkHealth = useCallback(async () => {
     try {
-      const resp = await fetch(`${API_BASE}/health`);
+      const resp = await fetch(cookieHarvesterPaths.health);
       const data = await resp.json();
       setHarvesterHealthy(data.success === true);
     } catch {
@@ -79,7 +75,7 @@ export function CookieHarvesterPage() {
     setLoading('start');
 
     try {
-      const resp = await fetch(`${API_BASE}/start`, {
+      const resp = await fetch(cookieHarvesterPaths.start, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ platform }),
@@ -107,7 +103,7 @@ export function CookieHarvesterPage() {
     setLoading('status');
 
     try {
-      const resp = await fetch(`${API_BASE}/status/${activeSession.sessionId}`);
+      const resp = await fetch(cookieHarvesterPaths.status(activeSession.sessionId));
       const data = await resp.json();
 
       if (!data.success) {
@@ -145,9 +141,10 @@ export function CookieHarvesterPage() {
       );
       const platform = platformEntry?.[0] as PlatformId | undefined;
 
+      const baseUrl = cookieHarvesterPaths.cookies(activeSession.sessionId);
       const url = platform
-        ? `${API_BASE}/cookies/${activeSession.sessionId}?platform=${platform}`
-        : `${API_BASE}/cookies/${activeSession.sessionId}`;
+        ? `${baseUrl}?platform=${platform}`
+        : baseUrl;
 
       const resp = await fetch(url);
       const data = await resp.json();
@@ -176,7 +173,7 @@ export function CookieHarvesterPage() {
     setLoading('close');
 
     try {
-      await fetch(`${API_BASE}/close/${activeSession.sessionId}`, { method: 'POST' });
+      await fetch(cookieHarvesterPaths.close(activeSession.sessionId), { method: 'POST' });
     } catch {
       // Ignore errors on close
     } finally {
@@ -249,14 +246,12 @@ export function CookieHarvesterPage() {
                 <div className="text-2xl">
                   {platform === 'weixin' ? '💬' :
                    platform === 'zhihu' ? '知' :
-                   platform === 'baijia' ? '百' :
                    platform === 'toutiao' ? '头' :
                    platform === 'csdn' ? 'C' :
                    platform === 'juejin' ? '掘' :
-                   platform === 'bilibili' ? 'B' :
                    platform === 'sohu' ? '搜' :
                    platform === 'netease' ? '网' :
-                   '百'}
+                   '📄'}
                 </div>
                 <span className="text-sm font-medium text-foreground">
                   {PLATFORM_LABELS[platform]}

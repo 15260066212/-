@@ -6,10 +6,13 @@ import { GEOConfigForm } from './components/GEOConfigForm.js';
 import { ConfigPreview } from './components/ConfigPreview.js';
 import { OptimizationPlanPage } from './pages/OptimizationPlanPage.js';
 import { ContentPage } from './pages/ContentPage.js';
+import { EkKnowledgePage } from './pages/EkKnowledgePage.js';
 import { PipelinePage } from './pages/PipelinePage.js';
 import { MonitorPage } from './pages/MonitorPage.js';
 import { CompetitorMonitorPage } from './pages/CompetitorMonitorPage.js';
 import { AccountManager } from './components/credentials/AccountManager.js';
+import { ProfileManagerPage } from './pages/ProfileManagerPage.js';
+import { NodeManagementPage } from './pages/NodeManagementPage.js';
 import { Sidebar, type NavKey, useMobileSidebar } from './components/layout/Sidebar.js';
 import { AppHeader } from './components/layout/AppHeader.js';
 import { STAGES, STAGE_DISPLAY_NAMES } from '@zemingengine/shared';
@@ -20,8 +23,11 @@ const TAB_LABELS: Record<NavKey, string> = {
   chat: 'GEO 配置',
   plan: '优化方案',
   content: '内容管理',
+  ek: '芯图EK',
   pipeline: '流水线',
   accounts: '账号管理',
+  profiles: 'Profile 管理',
+  nodes: '节点管理',
   competitor: '竞品监测',
   monitor: '运营监控',
 };
@@ -48,6 +54,13 @@ export function App() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const currentStage = sessionData?.currentStage ?? 'intro';
+
+  // Admin-only 路由守卫：非 admin 用户访问 nodes 时自动跳转
+  useEffect(() => {
+    if (activeTab === 'nodes' && user?.role !== 'admin') {
+      setActiveTab('chat');
+    }
+  }, [activeTab, user]);
 
   // Load existing company sessions when not in a session
   useEffect(() => {
@@ -295,10 +308,16 @@ export function App() {
               />
             ) : activeTab === 'content' ? (
               <ContentPage sessionId={sessionId} />
+            ) : activeTab === 'ek' ? (
+              <EkKnowledgePage sessionId={sessionId} />
             ) : activeTab === 'pipeline' ? (
               <PipelinePage sessionId={sessionId} sessionData={sessionData} />
             ) : activeTab === 'accounts' ? (
               <AccountManager sessionData={sessionData} />
+            ) : activeTab === 'profiles' ? (
+              <ProfileManagerPage />
+            ) : activeTab === 'nodes' ? (
+              <NodeManagementPage />
             ) : activeTab === 'competitor' ? (
               <CompetitorMonitorPage sessionData={sessionData} />
             ) : (

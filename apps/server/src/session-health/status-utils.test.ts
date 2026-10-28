@@ -13,28 +13,28 @@ import { MAX_CONSECUTIVE_FAILURES } from './types.js';
 
 describe('shouldMarkExpired', () => {
   it('连续失败次数达到阈值时返回 true', () => {
-    expect(shouldMarkExpired(MAX_CONSECUTIVE_FAILURES)).toBe(true);
+    expect(shouldMarkExpired(MAX_CONSECUTIVE_FAILURES)).toBe(true, 'should have correct shouldMarkExpired(MAX_CONSECUTIVE_FAILURES) when 连续失败次数达到阈值时返回 true');
   });
 
   it('连续失败次数超过阈值时返回 true', () => {
-    expect(shouldMarkExpired(MAX_CONSECUTIVE_FAILURES + 1)).toBe(true);
-    expect(shouldMarkExpired(10)).toBe(true);
+    expect(shouldMarkExpired(MAX_CONSECUTIVE_FAILURES + 1)).toBe(true, 'should have correct shouldMarkExpired(MAX_CONSECUTIVE_FAILURES + 1) when 连续失败次数超过阈值时返回 true');
+    expect(shouldMarkExpired(10)).toBe(true, 'should have correct shouldMarkExpired(10) when 连续失败次数超过阈值时返回 true');
   });
 
   it('连续失败次数低于阈值时返回 false', () => {
-    expect(shouldMarkExpired(0)).toBe(false);
-    expect(shouldMarkExpired(1)).toBe(false);
-    expect(shouldMarkExpired(MAX_CONSECUTIVE_FAILURES - 1)).toBe(false);
+    expect(shouldMarkExpired(0)).toBe(false, 'should have correct shouldMarkExpired(0) when 连续失败次数低于阈值时返回 false');
+    expect(shouldMarkExpired(1)).toBe(false, 'should have correct shouldMarkExpired(1) when 连续失败次数低于阈值时返回 false');
+    expect(shouldMarkExpired(MAX_CONSECUTIVE_FAILURES - 1)).toBe(false, 'should have correct shouldMarkExpired(MAX_CONSECUTIVE_FAILURES - 1) when 连续失败次数低于阈值时返回 false');
   });
 
   it('支持自定义最大失败次数', () => {
-    expect(shouldMarkExpired(2, 5)).toBe(false);
-    expect(shouldMarkExpired(5, 5)).toBe(true);
-    expect(shouldMarkExpired(6, 5)).toBe(true);
+    expect(shouldMarkExpired(2, 5)).toBe(false, 'should have correct shouldMarkExpired(2, 5) when 支持自定义最大失败次数');
+    expect(shouldMarkExpired(5, 5)).toBe(true, 'should have correct shouldMarkExpired(5, 5) when 支持自定义最大失败次数');
+    expect(shouldMarkExpired(6, 5)).toBe(true, 'should have correct shouldMarkExpired(6, 5) when 支持自定义最大失败次数');
   });
 
   it('边界情况：0 次失败时返回 false', () => {
-    expect(shouldMarkExpired(0)).toBe(false);
+    expect(shouldMarkExpired(0)).toBe(false, 'should have correct shouldMarkExpired(0) when 边界情况：0 次失败时返回 false');
   });
 });
 
@@ -42,8 +42,8 @@ describe('getTransitionAlert', () => {
   describe('恢复告警 (session_recovered)', () => {
     it('之前是 expired，现在变为 valid 时触发恢复告警', () => {
       const result = getTransitionAlert('expired', 'valid', 0, undefined);
-      expect(result.shouldAlert).toBe(true);
-      expect(result.alertType).toBe('session_recovered');
+      expect(result.shouldAlert).toBe(true, 'should have correct shouldAlert when 之前是 expired，现在变为 valid 时触发恢复告警');
+      expect(result.alertType).toBe('session_recovered', 'should have correct alertType when 之前是 expired，现在变为 valid 时触发恢复告警');
       expect(result.message).toBe('登录态已恢复正常');
     });
 

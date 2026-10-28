@@ -11,11 +11,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@zemingengine/shared": "*",
+    "@zemingengine/shared": "file:../shared",
+    "@zemingengine/wechatsync-core": "file:./wechatsync-core",
     "fingerprint-injector": "^2.1.88",
+    "js-md5": "^0.8.3",
+    "jszip": "^3.10.1",
+    "juice": "^11.1.0",
+    "linkedom": "^0.18.12",
+    "markdown-draft-js": "^2.4.0",
+    "marked": "^17.0.1",
     "playwright": "^1.49.0",
     "playwright-extra": "^4.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "remarkable": "^2.0.1",
+    "turndown": "^7.2.2"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

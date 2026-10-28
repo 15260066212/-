@@ -42,5 +42,49 @@
       "suggestion": 4
     },
     "scope": "packages/ai-engine/src/ (14 files + 1 new: summary-utils.ts)"
+  },
+  {
+    "date": "2026-10-09",
+    "mode": "Full Sweep (Round 2)",
+    "score": 91,
+    "findings": {
+      "critical": 0,
+      "warning": 1,
+      "suggestion": 3
+    },
+    "scope": "packages/ai-engine/src/ (16 files: +publishing-strategy-service.ts, +result-parser-service.ts)"
+  },
+  {
+    "date": "2026-10-09",
+    "mode": "Full Sweep (Round 3)",
+    "score": 94,
+    "findings": {
+      "critical": 0,
+      "warning": 1,
+      "suggestion": 1
+    },
+    "scope": "packages/ai-engine/src/ (17 files: +source-utils.ts)"
+  },
+  {
+    "date": "2026-10-09",
+    "mode": "Full Sweep (Round 4)",
+    "score": 98,
+    "findings": {
+      "critical": 0,
+      "warning": 0,
+      "suggestion": 2
+    },
+    "scope": "packages/ai-engine/src/ (17 files — visibility-analysis-service.ts refactored)"
+  },
+  {
+    "date": "2026-10-13",
+    "mode": "Full Sweep",
+    "score": 100,
+    "findings": {
+      "critical": 0,
+      "warning": 0,
+      "suggestion": 0
+    },
+    "scope": "packages/ai-engine/src/ (17 files — ai-platform-service.ts any cleanup + visibility-analysis-service.ts calculateScores refactor)"
   }
 ]

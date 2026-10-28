@@ -1,3 +1,5 @@
+import { classifyEcosystem } from './source-utils.js';
+
 interface Brand {
   name?: string;
   aliases?: string[];
@@ -21,6 +23,29 @@ interface MentionStats {
 interface Range {
   start: number;
   end: number;
+}
+
+/** Per-competitor mention statistics produced by collectCompetitorStats. */
+interface CompetitorStat extends MentionStats {
+  position_key: string;
+  id: string | null;
+  name: string;
+}
+
+/** Competitor stat enriched with visibility score and position rank. */
+interface ScoredCompetitor extends CompetitorStat {
+  position: number | null;
+  rank: number | null;
+  recommended: boolean;
+  visibility_score: number;
+}
+
+/** Result bundle from calculateScores, consumed by buildResult. */
+interface ScoreCalculation {
+  brandScore: number;
+  brandRecommended: boolean;
+  competitorsWithScore: ScoredCompetitor[];
+  shareOfVoice: number;
 }
 
 /** Characters to look back before a mention for recommendation context. */
@@ -50,6 +75,48 @@ const RANK_BONUS_THIRD = 0.5;
 /** Visibility bonus for recommended mentions. */
 const RECOMMEND_BONUS = 2;
 
+/**
+ * Platform source ecosystem weight factors.
+ * Based on citation analysis data: Doubao draws 60-85% from ByteDance ecosystem,
+ * so sources from that ecosystem carry higher visibility weight on that platform.
+ * See: https://fp8.co/articles/AI-Citation-Source-Preferences-GEO-Data-Map
+ */
+const PLATFORM_SOURCE_WEIGHTS: Record<string, Record<string, number>> = {
+  doubao: {
+    bytedance: 1.5,
+    zhihu: 1.2,
+    baidu: 1.0,
+    independent: 1.0,
+    other: 0.8,
+  },
+  deepseek: {
+    bytedance: 1.0,
+    zhihu: 1.3,
+    csdn: 1.2,
+    independent: 1.1,
+    other: 0.9,
+  },
+  kimi: {
+    bytedance: 1.0,
+    zhihu: 1.5,
+    wechat: 1.2,
+    independent: 1.1,
+    other: 0.9,
+  },
+  default: {
+    bytedance: 1.0,
+    zhihu: 1.2,
+    independent: 1.0,
+    other: 0.9,
+  },
+};
+
+/** Freshness threshold in days — content older than this is considered stale. */
+const FRESHNESS_THRESHOLD_DAYS = 14;
+
+/** Freshness penalty for stale content (applied as a multiplier < 1). */
+const STALE_CONTENT_PENALTY = 0.7;
+
 /** Negative recommendation phrases that cancel a positive signal (before the mention). */
 const NEGATIVE_BEFORE_PATTERN = /(不推荐|不建议|不优先|不太推荐|不太建议|并不推荐|不是很推荐|不算推荐|并非首选|不要选|避免选|谨慎选|谨慎选择)$/;
 
@@ -71,6 +138,50 @@ const SENTENCE_PUNCTUATION = /[。！？!?；;\n]/;
 const CLAUSE_PUNCTUATION = /[，,；;]/;
 
 export class VisibilityAnalysisService {
+
+  /**
+   * Classify a domain into an ecosystem bucket for platform-specific weighting.
+   * Delegates to the shared classifier in source-utils.ts (single source of truth).
+   */
+  classifySourceEcosystem(domain: string): string {
+    return classifyEcosystem(domain).ecosystem;
+  }
+
+  /**
+   * Get the platform-specific source ecosystem weight multiplier.
+   * Different LLM platforms weight sources from different ecosystems differently.
+   */
+  getSourceWeight(platform: string, ecosystem: string): number {
+    const weights = PLATFORM_SOURCE_WEIGHTS[platform] || PLATFORM_SOURCE_WEIGHTS.default;
+    return weights[ecosystem] ?? weights.other ?? 1.0;
+  }
+
+  /**
+   * Calculate a freshness multiplier based on content publish date.
+   * Doubao weights 1-2 week content highest; citation rates drop sharply after 1 month.
+   * Returns 1.0 for fresh content, STALE_CONTENT_PENALTY for stale, 1.0 if no date available.
+   */
+  getFreshnessMultiplier(publishTime: string | undefined | null): number {
+    if (!publishTime) return 1.0;
+    const pubDate = new Date(publishTime);
+    if (isNaN(pubDate.getTime())) return 1.0;
+    const daysSince = (Date.now() - pubDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSince <= FRESHNESS_THRESHOLD_DAYS) return 1.0;
+    if (daysSince <= 30) return 0.9;
+    return STALE_CONTENT_PENALTY;
+  }
+
+  /**
+   * Check if a source is stale (older than FRESHNESS_THRESHOLD_DAYS).
+   */
+  isStaleSource(publishTime: string | undefined | null): boolean {
+    if (!publishTime) return false;
+    const pubDate = new Date(publishTime);
+    if (isNaN(pubDate.getTime())) return false;
+    const daysSince = (Date.now() - pubDate.getTime()) / (1000 * 60 * 60 * 24);
+    return daysSince > FRESHNESS_THRESHOLD_DAYS;
+  }
+
   normalizeTerms(name: string | undefined, aliases: string[] | undefined): string[] {
     const seen = new Set<string>();
     const aliasList = Array.isArray(aliases) ? aliases : [];
@@ -251,19 +362,34 @@ export class VisibilityAnalysisService {
     return this.termRanges(text, terms).some((range) => this.isRecommended(text, range.start));
   }
 
-  visibilityScore(stats: MentionStats, position: number | null, recommended: boolean): number {
+  visibilityScore(stats: MentionStats, position: number | null, recommended: boolean, platform?: string, sourceDomain?: string, publishTime?: string | null): number {
     if (!stats?.mentioned) return 0;
     const pos = position ?? 0;
     const rankBonus = pos === 1 ? RANK_BONUS_FIRST : pos === 2 ? RANK_BONUS_SECOND : pos === 3 ? RANK_BONUS_THIRD : 0;
     const recommendBonus = recommended ? RECOMMEND_BONUS : 0;
-    return Number((Number(stats.mentions || 0) + rankBonus + recommendBonus).toFixed(2));
+    const baseScore = Number(stats.mentions || 0) + rankBonus + recommendBonus;
+
+    // Apply platform-specific source ecosystem weight
+    let weightedScore = baseScore;
+    if (platform && sourceDomain) {
+      const ecosystem = this.classifySourceEcosystem(sourceDomain);
+      const sourceWeight = this.getSourceWeight(platform, ecosystem);
+      weightedScore *= sourceWeight;
+    }
+
+    // Apply freshness multiplier
+    if (publishTime) {
+      weightedScore *= this.getFreshnessMultiplier(publishTime);
+    }
+
+    return Number(weightedScore.toFixed(2));
   }
 
-  analyzeResponse({ responseText, brand, competitors }: { responseText: string; brand: Brand; competitors: Competitor[] }) {
-    const text = String(responseText || '');
-    const brandTerms = this.buildBrandVisibilityTerms(brand);
-    const brandStats = this.mentionStats(text, brandTerms);
-    const competitorStats = (Array.isArray(competitors) ? competitors : []).map((competitor, index) => {
+  /**
+   * Compute mention stats for each competitor, removing overlapping brand terms.
+   */
+  private collectCompetitorStats(text: string, competitors: Competitor[], brandTerms: string[]): CompetitorStat[] {
+    return (Array.isArray(competitors) ? competitors : []).map((competitor, index) => {
       const terms = this.removeOverlappingTerms(
         this.normalizeTerms(competitor?.name, competitor?.aliases),
         brandTerms
@@ -275,29 +401,54 @@ export class VisibilityAnalysisService {
         ...this.mentionStats(text, terms)
       };
     });
+  }
 
-    const positioned = [
-      brandStats.mentioned ? { type: 'brand' as const, first_index: brandStats.first_index } : null,
+  /**
+   * Build a position ranking from brand + competitor mention stats.
+   * Returns brand position (1-based) and a map of competitor position keys to ranks.
+   */
+  private positionCompetitors(brandStats: MentionStats, competitorStats: CompetitorStat[]) {
+    type PositionedItem = { type: 'brand' | 'competitor'; position_key?: string; first_index: number };
+    const positioned: PositionedItem[] = [
+      brandStats.mentioned ? { type: 'brand', first_index: brandStats.first_index } as PositionedItem : null,
       ...competitorStats
         .filter((item) => item.mentioned)
-        .map((item) => ({ type: 'competitor' as const, position_key: item.position_key, first_index: item.first_index }))
+        .map((item): PositionedItem => ({ type: 'competitor', position_key: item.position_key, first_index: item.first_index })),
     ]
-      .filter(Boolean)
-      .sort((a, b) => a!.first_index - b!.first_index);
+      .filter((item): item is PositionedItem => item !== null)
+      .sort((a, b) => a.first_index - b.first_index);
 
-    const brandPositionIndex = positioned.findIndex((item) => item!.type === 'brand');
+    const brandPositionIndex = positioned.findIndex((item) => item.type === 'brand');
     const competitorPositions = new Map<string, number>();
     positioned.forEach((item, index) => {
-      if (item!.type === 'competitor') competitorPositions.set(item!.position_key, index + 1);
+      if (item.type === 'competitor' && item.position_key) competitorPositions.set(item.position_key, index + 1);
     });
 
-    const brandPosition = brandPositionIndex === -1 ? null : brandPositionIndex + 1;
+    return {
+      brandPosition: brandPositionIndex === -1 ? null : brandPositionIndex + 1,
+      competitorPositions,
+    };
+  }
+
+  /**
+   * Calculate visibility scores for brand and all competitors.
+   */
+  private calculateScores(ctx: {
+    text: string;
+    brandStats: MentionStats;
+    brandTerms: string[];
+    brandPosition: number | null;
+    competitorStats: CompetitorStat[];
+    competitorPositions: Map<string, number>;
+    competitors: Competitor[];
+  }): ScoreCalculation {
+    const { text, brandStats, brandTerms, brandPosition, competitorStats, competitorPositions, competitors } = ctx;
     const brandRecommended = this.isAnyMentionRecommended(text, brandTerms);
     const brandScore = this.visibilityScore(brandStats, brandPosition, brandRecommended);
-    const competitorRows = Array.isArray(competitors) ? competitors : [];
+
     const competitorsWithScore = competitorStats.map((item, index) => {
       const position = competitorPositions.get(item.position_key) || null;
-      const competitor = competitorRows[index];
+      const competitor = competitors[index];
       const recommended = this.isAnyMentionRecommended(
         text,
         this.removeOverlappingTerms(this.normalizeTerms(competitor?.name, competitor?.aliases), brandTerms)
@@ -316,6 +467,20 @@ export class VisibilityAnalysisService {
       ? Number(((brandScore / totalScore) * 100).toFixed(2))
       : 0;
 
+    return { brandScore, brandRecommended, competitorsWithScore, shareOfVoice };
+  }
+
+  /**
+   * Assemble the final analysis result object.
+   */
+  private buildResult(
+    brandStats: MentionStats,
+    brandPosition: number | null,
+    brandRecommended: boolean,
+    brandScore: number,
+    competitorsWithScore: ScoredCompetitor[],
+    shareOfVoice: number,
+  ) {
     return {
       brand_mentioned: brandStats.mentioned,
       brand_mentions: brandStats.mentions,
@@ -335,8 +500,26 @@ export class VisibilityAnalysisService {
         recommended: item.recommended,
         visibility_score: item.visibility_score
       })),
-      share_of_voice: shareOfVoice
+      share_of_voice: shareOfVoice,
+      freshness_alerts: {
+        threshold_days: FRESHNESS_THRESHOLD_DAYS,
+        warning: 'Doubao weights 1-2 week content highest; citation rates drop sharply after 1 month. Consider refreshing high-ranking content.',
+      },
     };
+  }
+
+  analyzeResponse({ responseText, brand, competitors }: { responseText: string; brand: Brand; competitors: Competitor[] }) {
+    const text = String(responseText || '');
+    const brandTerms = this.buildBrandVisibilityTerms(brand);
+    const brandStats = this.mentionStats(text, brandTerms);
+
+    const competitorStats = this.collectCompetitorStats(text, competitors, brandTerms);
+    const { brandPosition, competitorPositions } = this.positionCompetitors(brandStats, competitorStats);
+
+    const { brandScore, brandRecommended, competitorsWithScore, shareOfVoice } =
+      this.calculateScores({ text, brandStats, brandTerms, brandPosition, competitorStats, competitorPositions, competitors });
+
+    return this.buildResult(brandStats, brandPosition, brandRecommended, brandScore, competitorsWithScore, shareOfVoice);
   }
 }
 

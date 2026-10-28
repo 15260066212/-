@@ -20,6 +20,42 @@ export class WechatAdapter extends PlatformAdapter {
     return 'api';
   }
 
+  /**
+   * Save the article as a draft on WeChat (draft/add API) WITHOUT submitting
+   * it for publication. The returned media_id is the platform draft id; the
+   * article will remain in the 草稿箱 until the user manually publishes it
+   * on the WeChat MP platform.
+   */
+  async saveDraft(params: PublishParams): Promise<PublishResult> {
+    const { article, credentials } = params;
+
+    const appId = credentials.data.appId || credentials.data.app_id || '';
+    const appSecret = credentials.data.appSecret || credentials.data.app_secret || '';
+
+    if (!appId || !appSecret) {
+      return { success: false, error: 'Missing appId or appSecret in WeChat credentials' };
+    }
+
+    try {
+      const accessToken = await this.getAccessToken(appId, appSecret);
+      const mediaId = await this.createDraft(accessToken, article);
+
+      return {
+        success: true,
+        postId: mediaId,
+        postUrl: `https://mp.weixin.qq.com`,
+        verificationStatus: 'draft_saved',
+        verificationMessage: 'Article saved to WeChat draft box. Manual publication required.',
+        draftSaved: true,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown WeChat draft API error',
+      };
+    }
+  }
+
   async publish(params: PublishParams): Promise<PublishResult> {
     const { article, credentials } = params;
 
@@ -260,7 +296,7 @@ export class WechatAdapter extends PlatformAdapter {
    * @param postId - The platform post ID (publish_id or media_id)
    * @returns Verification result with status and message
    */
-  override async verifyWithCredentials(
+  async verifyWithCredentials(
     credentials: PlatformCredentials,
     postId?: string,
   ): Promise<VerificationResult> {

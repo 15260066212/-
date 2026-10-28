@@ -3,7 +3,7 @@ import { chatCompletion, isAIAvailable } from './client.js';
 import { extractJsonObject } from './json-utils.js';
 import { buildProfileSummaryLines } from './summary-utils.js';
 
-const PPT_ANALYSIS_PROMPT = `你是一个 GEO（AI 搜索引擎优化）专家。分析以下从企业 PPT/介绍材料中提取的文本内容，提取关键信息。
+const DOCUMENT_ANALYSIS_PROMPT = `你是一个 GEO（AI 搜索引擎优化）专家。分析以下从企业 PPT/Word 文档/介绍材料中提取的文本内容，提取关键信息。
 
 要求：
 1. 提取企业全称和简称
@@ -25,7 +25,7 @@ GEO 关键词原则：
 
 以 JSON 格式返回，字段：fullName, shortName, description, scale, location, products(数组), brandStory, trustAnchors(数组), brandTone(数组), keywords(数组，每个元素含 question/type/priority)`;
 
-interface PptAnalysisResult {
+interface DocumentAnalysisResult {
   fullName: string;
   shortName: string;
   description: string;
@@ -38,20 +38,47 @@ interface PptAnalysisResult {
   keywords: { question: string; type: KeywordType; priority: number }[];
 }
 
+type DocumentKind = 'ppt' | 'docx';
+
+const DOCUMENT_META: Record<DocumentKind, { label: string; unit: string; icon: string }> = {
+  ppt: { label: 'PPT', unit: '页幻灯片', icon: '📄' },
+  docx: { label: 'Word 文档', unit: '段', icon: '📝' },
+};
+
+interface DocumentAnalysisOutput {
+  summary: string;
+  enterprise: Partial<EnterpriseProfile>;
+  keywords: { question: string; type: KeywordType; priority: number; geoContext: string }[];
+}
+
 export async function analyzePptContent(
   slideTexts: string[],
   fileName: string,
   session: SessionData,
-): Promise<{
-  summary: string;
-  enterprise: Partial<EnterpriseProfile>;
-  keywords: { question: string; type: KeywordType; priority: number; geoContext: string }[];
-}> {
-  const combinedText = slideTexts.join('\n\n---\n\n');
+): Promise<DocumentAnalysisOutput> {
+  return analyzeDocumentTexts(slideTexts, fileName, session, 'ppt');
+}
+
+export async function analyzeDocxContent(
+  paragraphTexts: string[],
+  fileName: string,
+  session: SessionData,
+): Promise<DocumentAnalysisOutput> {
+  return analyzeDocumentTexts(paragraphTexts, fileName, session, 'docx');
+}
+
+async function analyzeDocumentTexts(
+  texts: string[],
+  fileName: string,
+  session: SessionData,
+  kind: DocumentKind,
+): Promise<DocumentAnalysisOutput> {
+  const meta = DOCUMENT_META[kind];
+  const combinedText = texts.join('\n\n---\n\n');
 
   if (!isAIAvailable()) {
     return {
-      summary: `已导入 PPT：${fileName}\n共 ${slideTexts.length} 页幻灯片\n\n（未配置 AI 服务，已提取原始文本，请手动补充信息。）\n\n提取内容摘要：\n${combinedText.slice(0, 500)}...`,
+      summary: `已导入 ${meta.label}：${fileName}\n共 ${texts.length} ${meta.unit}\n\n（未配置 AI 服务，已提取原始文本，请手动补充信息。）\n\n提取内容摘要：\n${combinedText.slice(0, 500)}...`,
       enterprise: {},
       keywords: [],
     };
@@ -59,24 +86,24 @@ export async function analyzePptContent(
 
   try {
     const userInput = `文件名: ${fileName}
-幻灯片页数: ${slideTexts.length}
+${meta.label}内容块数: ${texts.length}
 
-幻灯片内容:
+内容:
 ${combinedText.slice(0, 4000)}`;
 
-    const response = await chatCompletion(PPT_ANALYSIS_PROMPT, userInput, {
+    const response = await chatCompletion(DOCUMENT_ANALYSIS_PROMPT, userInput, {
       temperature: 0.3,
       maxTokens: 1500,
     });
 
     const jsonStr = extractJsonObject(response);
     if (!jsonStr) {
-      return fallbackPptAnalysis(slideTexts, fileName);
+      return fallbackDocumentAnalysis(texts, fileName, kind);
     }
 
-    const analysis: PptAnalysisResult = JSON.parse(jsonStr);
+    const analysis: DocumentAnalysisResult = JSON.parse(jsonStr);
 
-    const summary = generatePptSummary(analysis, fileName, slideTexts.length);
+    const summary = generateDocumentSummary(analysis, fileName, texts.length, kind);
 
     return {
       summary,
@@ -86,7 +113,7 @@ ${combinedText.slice(0, 4000)}`;
         description: analysis.description || session.enterprise.description,
         scale: analysis.scale || session.enterprise.scale,
         location: analysis.location || session.enterprise.location,
-        products: analysis.products.map((name) => ({
+        products: (analysis.products ?? []).map((name) => ({
           name,
           description: '',
           category: '',
@@ -96,30 +123,37 @@ ${combinedText.slice(0, 4000)}`;
         trustAnchors: analysis.trustAnchors || session.enterprise.trustAnchors,
         brandTone: analysis.brandTone || session.enterprise.brandTone,
       },
-      keywords: analysis.keywords.map((kw, index) => ({
+      keywords: (analysis.keywords ?? []).map((kw, index) => ({
         question: kw.question,
         type: kw.type || ('core' as const),
         priority: kw.priority || index + 1,
-        geoContext: `从 PPT 提取的关键词`,
+        geoContext: `从 ${meta.label} 提取的关键词`,
       })),
     };
   } catch {
-    return fallbackPptAnalysis(slideTexts, fileName);
+    return fallbackDocumentAnalysis(texts, fileName, kind);
   }
 }
 
-function fallbackPptAnalysis(slideTexts: string[], fileName: string) {
-  const combinedText = slideTexts.join('\n');
+function fallbackDocumentAnalysis(texts: string[], fileName: string, kind: DocumentKind) {
+  const meta = DOCUMENT_META[kind];
+  const combinedText = texts.join('\n');
   return {
-    summary: `已导入 PPT：${fileName}\n共 ${slideTexts.length} 页幻灯片\n\n（AI 分析不可用，已提取原始文本，请手动补充信息。）\n\n提取内容摘要：\n${combinedText.slice(0, 500)}...`,
+    summary: `已导入 ${meta.label}：${fileName}\n共 ${texts.length} ${meta.unit}\n\n（AI 分析不可用，已提取原始文本，请手动补充信息。）\n\n提取内容摘要：\n${combinedText.slice(0, 500)}...`,
     enterprise: {},
     keywords: [],
   };
 }
 
-function generatePptSummary(analysis: PptAnalysisResult, fileName: string, slideCount: number): string {
-  const lines = [`📄 已分析 PPT：${fileName}（共 ${slideCount} 页）`, ''];
+function generateDocumentSummary(
+  analysis: DocumentAnalysisResult,
+  fileName: string,
+  count: number,
+  kind: DocumentKind,
+): string {
+  const meta = DOCUMENT_META[kind];
+  const lines = [`${meta.icon} 已分析 ${meta.label}：${fileName}（共 ${count} ${meta.unit}）`, ''];
   lines.push(...buildProfileSummaryLines(analysis));
-  lines.push('', '以上信息已从 PPT 自动提取并填入企业画像，你可以确认或修改。');
+  lines.push('', `以上信息已从 ${meta.label} 自动提取并填入企业画像，你可以确认或修改。`);
   return lines.join('\n');
 }

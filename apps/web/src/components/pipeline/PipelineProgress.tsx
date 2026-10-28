@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { PipelineStatus, PipelineRun, PlatformId } from '@zemingengine/shared';
 import {
-  Loader2, CheckCircle2, AlertCircle, Clock,
+  Loader2, CheckCircle2, AlertCircle, Clock, Pause, Play,
   FileText, Shield, Send, RefreshCw, Activity, XCircle, MessageSquare, Send as SendIcon,
   Tag, Plus, X,
 } from 'lucide-react';
@@ -37,12 +37,15 @@ type StageKey = typeof STAGE_STEPS[number]['key'];
 interface Props {
   status: PipelineStatus | null;
   isRunning: boolean;
+  isPaused?: boolean;
   runId: string | null;
   sessionId: string;
   onCancel?: (runId: string) => void;
+  onPause?: (runId: string) => void;
+  onResume?: (runId: string) => void;
 }
 
-export function PipelineProgress({ status, isRunning, runId, sessionId, onCancel }: Props) {
+export function PipelineProgress({ status, isRunning, isPaused, runId, sessionId, onCancel, onPause, onResume }: Props) {
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
@@ -226,6 +229,8 @@ export function PipelineProgress({ status, isRunning, runId, sessionId, onCancel
   const isCompleted = run?.status === 'completed';
   const isFailed = run?.status === 'failed';
   const isCancelled = run?.status === 'cancelled';
+  const actuallyRunning = run?.status === 'running';
+  const actuallyPaused = isPaused || run?.status === 'paused';
 
   const currentStage: StageKey = useMemo(() => {
     if (status && status.reviewing > 0 && status.draft === 0) return 'reviewing';
@@ -244,27 +249,56 @@ export function PipelineProgress({ status, isRunning, runId, sessionId, onCancel
     <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
       {/* Header */}
       <div className={`px-5 py-4 border-b border-border ${
-        isCompleted ? 'bg-success/5' : isFailed || isCancelled ? 'bg-error/5' : 'bg-primary/5'
+        isCompleted ? 'bg-success/5'
+        : isFailed || isCancelled ? 'bg-error/5'
+        : actuallyPaused ? 'bg-warning/5'
+        : 'bg-primary/5'
       }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {isRunning ? (
+            {actuallyRunning ? (
               <Loader2 className="w-5 h-5 text-primary animate-spin" />
+            ) : actuallyPaused ? (
+              <Pause className="w-5 h-5 text-warning" />
             ) : isCompleted ? (
               <CheckCircle2 className="w-5 h-5 text-success" />
             ) : (
               <AlertCircle className="w-5 h-5 text-error" />
             )}
             <span className="text-sm font-semibold text-foreground">
-              {isCompleted ? '流水线已完成' : isFailed ? '流水线失败' : isCancelled ? '流水线已取消' : '流水线运行中'}
+              {isCompleted ? '流水线已完成' : isFailed ? '流水线失败' : isCancelled ? '流水线已取消' : actuallyPaused ? '流水线已暂停' : '流水线运行中'}
             </span>
+            {actuallyPaused && (
+              <span className="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded-full">等待恢复</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {isRunning && (
+            {(actuallyRunning || actuallyPaused) && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock className="w-3.5 h-3.5" />
                 <span className="tabular-nums">{formatTime(elapsed)}</span>
               </div>
+            )}
+            {/* Pause / Resume button */}
+            {runId && actuallyRunning && onPause && (
+              <button
+                onClick={() => onPause(runId)}
+                className="inline-flex items-center gap-1 rounded-md border border-warning/50 bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning hover:bg-warning/20 transition-colors"
+                title="暂停流水线（当前文章完成后暂停）"
+              >
+                <Pause className="w-3.5 h-3.5" />
+                暂停
+              </button>
+            )}
+            {runId && actuallyPaused && onResume && (
+              <button
+                onClick={() => onResume(runId)}
+                className="inline-flex items-center gap-1 rounded-md border border-success/50 bg-success/10 px-2.5 py-1 text-xs font-medium text-success hover:bg-success/20 transition-colors"
+                title="恢复流水线"
+              >
+                <Play className="w-3.5 h-3.5" />
+                恢复
+              </button>
             )}
             {onCancel && runId && (isRunning || isCompleted || isFailed || isCancelled) && (
               <button
@@ -334,11 +368,17 @@ export function PipelineProgress({ status, isRunning, runId, sessionId, onCancel
         </div>
 
         {/* Current operation */}
-        {isRunning && (
-          <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5">
-            <Activity className="w-4 h-4 text-primary animate-pulse" />
+        {(actuallyRunning || actuallyPaused) && (
+          <div className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 ${actuallyPaused ? 'border-warning/20 bg-warning/5' : 'border-primary/20 bg-primary/5'}`}>
+            {actuallyPaused ? (
+              <Pause className="w-4 h-4 text-warning" />
+            ) : (
+              <Activity className="w-4 h-4 text-primary animate-pulse" />
+            )}
             <div className="flex-1 min-w-0 text-sm">
-              {run?.currentPlatform ? (
+              {actuallyPaused ? (
+                <span className="text-warning">流水线已暂停 — 点击「恢复」按钮继续执行</span>
+              ) : run?.currentPlatform ? (
                 <span className="text-foreground">
                   正在处理 <span className="font-medium text-primary">{PLATFORM_LABELS[run.currentPlatform] ?? run.currentPlatform}</span>
                   {run.currentRound ? <span className="text-muted-foreground"> · 第 {run.currentRound} 轮</span> : null}
@@ -357,7 +397,7 @@ export function PipelineProgress({ status, isRunning, runId, sessionId, onCancel
         )}
 
         {/* Quick stats when running */}
-        {isRunning && status && (
+        {(actuallyRunning || actuallyPaused) && status && (
           <div className="grid grid-cols-4 gap-2">
             {[
               { label: '草稿', value: status.draft, color: 'text-foreground/70' },
@@ -405,7 +445,7 @@ export function PipelineProgress({ status, isRunning, runId, sessionId, onCancel
             </div>
             <div className="text-xs text-muted-foreground space-y-0.5">
               <div>总文章数：{run.totalArticles} 篇</div>
-              <div>已发布：{status?.published ?? 0} 篇 · 失败：{status?.failed ?? 0} 篇</div>
+              <div>已发布：{status?.published ?? 0} 篇 · 仅存草稿：{status?.draft_saved ?? 0} 篇 · 失败：{status?.failed ?? 0} 篇</div>
               {run.completedAt && (
                 <div>完成时间：{new Date(run.completedAt).toLocaleString('zh-CN')}</div>
               )}

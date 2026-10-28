@@ -4,19 +4,16 @@ import {
   CsdnRpaHandler,
   ZhihuRpaHandler,
   JuejinRpaHandler,
-  BaijiaRpaHandler,
   ToutiaoRpaHandler,
-  BilibiliRpaHandler,
   SohuRpaHandler,
   NeteaseRpaHandler,
-  BaiduZhidaoRpaHandler,
 } from './index.js';
 import { RPAEngine } from '../rpa-engine.js';
 import { Publisher } from '../publisher.js';
 import { RpaHandler } from './base.js';
 
 /**
- * Test fixture: all 9 RPA handler classes and their expected platform IDs.
+ * Test fixture: all 6 RPA handler classes and their expected platform IDs.
  */
 const HANDLER_SPECS: Array<{
   name: string;
@@ -26,17 +23,14 @@ const HANDLER_SPECS: Array<{
   { name: 'CsdnRpaHandler', HandlerClass: CsdnRpaHandler, expectedPlatform: 'csdn' },
   { name: 'ZhihuRpaHandler', HandlerClass: ZhihuRpaHandler, expectedPlatform: 'zhihu' },
   { name: 'JuejinRpaHandler', HandlerClass: JuejinRpaHandler, expectedPlatform: 'juejin' },
-  { name: 'BaijiaRpaHandler', HandlerClass: BaijiaRpaHandler, expectedPlatform: 'baijia' },
   { name: 'ToutiaoRpaHandler', HandlerClass: ToutiaoRpaHandler, expectedPlatform: 'toutiao' },
-  { name: 'BilibiliRpaHandler', HandlerClass: BilibiliRpaHandler, expectedPlatform: 'bilibili' },
   { name: 'SohuRpaHandler', HandlerClass: SohuRpaHandler, expectedPlatform: 'sohu' },
   { name: 'NeteaseRpaHandler', HandlerClass: NeteaseRpaHandler, expectedPlatform: 'netease' },
-  { name: 'BaiduZhidaoRpaHandler', HandlerClass: BaiduZhidaoRpaHandler, expectedPlatform: 'zhidao' },
 ];
 
 describe('RPA Handlers - Export and Platform Property', () => {
-  it('should export exactly 9 handler classes', () => {
-    expect(HANDLER_SPECS).toHaveLength(9);
+  it('should export exactly 6 handler classes', () => {
+    expect(HANDLER_SPECS).toHaveLength(6);
   });
 
   for (const spec of HANDLER_SPECS) {
@@ -55,10 +49,10 @@ describe('RPA Handlers - Export and Platform Property', () => {
     });
   }
 
-  it('all 9 handler platform IDs should be unique', () => {
+  it('all 6 handler platform IDs should be unique', () => {
     const platforms = HANDLER_SPECS.map((s) => s.expectedPlatform);
     const unique = new Set(platforms);
-    expect(unique.size).toBe(9);
+    expect(unique.size).toBe(6);
   });
 });
 
@@ -68,12 +62,12 @@ describe('RPAEngine - Handler Registration', () => {
     expect(engine.handlerCount).toBe(0);
   });
 
-  it('can register all 9 handlers manually', () => {
+  it('can register all 6 handlers manually', () => {
     const engine = new RPAEngine();
     for (const spec of HANDLER_SPECS) {
       engine.registerHandler(new spec.HandlerClass());
     }
-    expect(engine.handlerCount).toBe(9);
+    expect(engine.handlerCount).toBe(6);
     for (const spec of HANDLER_SPECS) {
       expect(engine.hasHandler(spec.expectedPlatform)).toBe(true);
     }
@@ -105,8 +99,8 @@ describe('Publisher.createDefault - Unified Platform Registration', () => {
   it('should have exactly 1 API adapter registered (weixin)', () => {
     const publisher = Publisher.createDefault();
     const allPlatforms: PlatformId[] = [
-      'weixin', 'csdn', 'zhihu', 'baijia', 'toutiao',
-      'juejin', 'bilibili', 'sohu', 'netease', 'zhidao',
+      'weixin', 'csdn', 'zhihu', 'toutiao',
+      'juejin', 'sohu', 'netease',
     ];
 
     let registeredCount = 0;
@@ -116,24 +110,24 @@ describe('Publisher.createDefault - Unified Platform Registration', () => {
     expect(registeredCount).toBe(1);
   });
 
-  it('supportsPlatform returns true for all 10 platforms (API + RPA)', () => {
+  it('supportsPlatform returns true for all 7 platforms (API + RPA)', () => {
     const publisher = Publisher.createDefault();
     const allPlatforms: PlatformId[] = [
-      'weixin', 'csdn', 'zhihu', 'baijia', 'toutiao',
-      'juejin', 'bilibili', 'sohu', 'netease', 'zhidao',
+      'weixin', 'csdn', 'zhihu', 'toutiao',
+      'juejin', 'sohu', 'netease',
     ];
     for (const p of allPlatforms) {
       expect(publisher.supportsPlatform(p)).toBe(true);
     }
   });
 
-  it('listSupportedPlatforms returns all 10 platforms', () => {
+  it('listSupportedPlatforms returns all 7 platforms', () => {
     const publisher = Publisher.createDefault();
     const platforms = publisher.listSupportedPlatforms();
-    expect(platforms.length).toBe(10);
+    expect(platforms.length).toBe(7);
     expect(platforms).toContain('weixin');
     expect(platforms).toContain('zhihu');
-    expect(platforms).toContain('baijia');
+    expect(platforms).toContain('toutiao');
   });
 
   it('weixin adapter should use api method', () => {
@@ -144,8 +138,8 @@ describe('Publisher.createDefault - Unified Platform Registration', () => {
   it('all RPA platforms should use rpa method (default when no adapter)', () => {
     const publisher = Publisher.createDefault();
     const rpaPlatforms: PlatformId[] = [
-      'csdn', 'zhihu', 'baijia', 'toutiao',
-      'juejin', 'bilibili', 'sohu', 'netease', 'zhidao',
+      'csdn', 'zhihu', 'toutiao',
+      'juejin', 'sohu', 'netease',
     ];
 
     for (const platform of rpaPlatforms) {
@@ -156,8 +150,8 @@ describe('Publisher.createDefault - Unified Platform Registration', () => {
   it('RPA platforms should not have adapters (handled by RPAEngine)', () => {
     const publisher = Publisher.createDefault();
     const rpaPlatforms: PlatformId[] = [
-      'csdn', 'zhihu', 'baijia', 'toutiao',
-      'juejin', 'bilibili', 'sohu', 'netease', 'zhidao',
+      'csdn', 'zhihu', 'toutiao',
+      'juejin', 'sohu', 'netease',
     ];
 
     for (const platform of rpaPlatforms) {

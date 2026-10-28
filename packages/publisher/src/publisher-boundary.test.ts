@@ -20,8 +20,8 @@ describe('Publisher / RPAEngine 边界', () => {
 
       // RPA 平台 - createDefault 应该也注册了这些
       const rpaPlatforms: PlatformId[] = [
-        'zhihu', 'baijia', 'toutiao', 'csdn', 'juejin',
-        'bilibili', 'sohu', 'netease', 'zhidao',
+        'zhihu', 'toutiao', 'csdn', 'juejin',
+        'sohu', 'netease',
       ];
       for (const p of rpaPlatforms) {
         expect(pub.supportsPlatform(p)).toBe(true);
@@ -31,10 +31,10 @@ describe('Publisher / RPAEngine 边界', () => {
     it('返回支持的平台列表', () => {
       const pub = Publisher.createDefault();
       const platforms = pub.listSupportedPlatforms();
-      expect(platforms.length).toBeGreaterThanOrEqual(10);
+      expect(platforms.length).toBeGreaterThanOrEqual(7);
       expect(platforms).toContain('weixin');
       expect(platforms).toContain('zhihu');
-      expect(platforms).toContain('baijia');
+      expect(platforms).toContain('toutiao');
     });
   });
 

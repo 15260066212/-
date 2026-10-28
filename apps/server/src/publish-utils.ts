@@ -4,8 +4,13 @@ import type { DatabaseAccess } from './db.js';
 import type { Publisher } from '@zemingengine/publisher';
 
 /**
- * Execute publishWithRetry and handle result/error by updating task and article status.
+ * Execute saveDraftWithRetry and handle result/error by updating task and article status.
  * Shared between scheduler and pipeline to eliminate duplicate error handling.
+ *
+ * Draft-first flow: articles are saved to the platform's draft box, NOT published
+ * directly. On success the task/article status is set to 'draft_saved' and the
+ * user must manually publish on the platform, then confirm via the
+ * /publish/:taskId/confirm-published endpoint.
  */
 export async function executePublishWithHandling(
   db: DatabaseAccess,
@@ -16,7 +21,7 @@ export async function executePublishWithHandling(
   logPrefix = '',
 ): Promise<void> {
   try {
-    const result = await publisher.publishWithRetry(
+    const result = await publisher.saveDraftWithRetry(
       task,
       article,
       credentials,
@@ -24,22 +29,24 @@ export async function executePublishWithHandling(
     );
 
     if (result.success) {
+      // Article saved to platform draft box — mark as draft_saved, not published.
       db.publish.updatePublishTask(task.id, {
-        status: 'published',
+        status: 'draft_saved',
         platformPostId: result.postId,
         platformPostUrl: result.postUrl,
-        publishedAt: new Date().toISOString(),
+        verificationStatus: result.verificationStatus ?? 'draft_saved',
+        verificationMessage: result.verificationMessage,
       });
-      const articleUpdate: Partial<Article> = { status: 'published' };
+      const articleUpdate: Partial<Article> = { status: 'draft_saved' };
       if (result.postUrl) {
         articleUpdate.publishUrl = result.postUrl;
       }
       db.articles.updateArticle(article.id, articleUpdate);
       if (logPrefix) {
-        console.log(`${logPrefix} Task ${task.id} published successfully`);
+        console.log(`${logPrefix} Task ${task.id} saved to draft box successfully`);
       }
     } else {
-      const error = result.error ?? 'Unknown publish error';
+      const error = result.error ?? 'Unknown draft-save error';
       const analysis = classifyFailure(error);
       db.publish.updatePublishTask(task.id, {
         status: 'failed',
@@ -49,7 +56,7 @@ export async function executePublishWithHandling(
       db.articles.updateArticle(article.id, { status: 'failed' });
       if (logPrefix) {
         console.warn(
-          `${logPrefix} Task ${task.id} publish failed: ${error} (${analysis.category})`,
+          `${logPrefix} Task ${task.id} draft-save failed: ${error} (${analysis.category})`,
         );
       }
     }
@@ -63,7 +70,7 @@ export async function executePublishWithHandling(
     });
     db.articles.updateArticle(article.id, { status: 'failed' });
     if (logPrefix) {
-      console.error(`${logPrefix} Task ${task.id} publish threw error:`, error);
+      console.error(`${logPrefix} Task ${task.id} draft-save threw error:`, error);
     }
   }
 }

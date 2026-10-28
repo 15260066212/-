@@ -21,7 +21,8 @@
     "@zemingengine/publisher": "file:../../packages/publisher",
     "@zemingengine/scraper": "file:../../packages/scraper",
     "@zemingengine/shared": "file:../../packages/shared",
-    "better-sqlite3": "^12.0.0",
+    "@zilliz/milvus2-sdk-node": "^2.4.9",
+    "better-sqlite3": "^11.10.0",
     "dotenv": "^17.4.2",
     "hono": "^4.7.7",
     "jszip": "^3.10.2"

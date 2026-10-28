@@ -1,4 +1,5 @@
 import type { DatabaseAccess } from '../db.js';
+import { getHarvesterPlatformName } from '@zemingengine/shared';
 import { HarvesterClient, type RefreshResponse } from '../session-health/harvester-client.js';
 
 // === Cookie Warmer (Profile-first) ===
@@ -138,7 +139,9 @@ export class CookieWarmer {
     // Strategy 1: Profile renewal (if accountName exists)
     if (cred.accountName) {
       try {
-        const profileResult = await client.renewProfile(platform, cred.accountName);
+        // harvester 的 profile 目录按 harvester 平台名命名（chrome-{account}-{toutiaohao}），
+        // 必须先把内部平台名映射过去，否则 renew 永远 404
+        const profileResult = await client.renewProfile(getHarvesterPlatformName(platform), cred.accountName);
         if (profileResult?.success && profileResult.loggedIn) {
           this.db.credentials.updateCredentialStatus(platform, 'active', 'user_default', accountId);
           const stats = this.getOrCreateStats(platform);
@@ -254,8 +257,13 @@ export class CookieWarmer {
     const allCreds = this.db.credentials.getAllCredentials();
     const warmThreshold = Date.now() - WARM_THRESHOLD_MS;
 
+    // 已有 API 适配器的平台 (WechatSyncCore / ToutiaoApi) 全部跳过 cookie warming
+    // 这些平台用纯 Node fetch 发请求，不需要浏览器预热 cookie
+    const API_PLATFORMS = new Set(['csdn', 'juejin', 'zhihu', 'sohu', 'toutiao']);
+
     const due = allCreds.filter((c) => {
       if (c.status === 'invalid') return false;
+      if (API_PLATFORMS.has(c.platform)) return false;
       const lastValidated = c.lastValidatedAt ? new Date(c.lastValidatedAt).getTime() : 0;
       return lastValidated < warmThreshold;
     });
@@ -315,7 +323,8 @@ export class CookieWarmer {
     // Strategy 1: Profile renewal (if accountName exists)
     if (cred.accountName) {
       try {
-        const profileResult = await client.renewProfile(cred.platform, cred.accountName);
+        // 同上：profile 目录按 harvester 平台名命名，先映射再续期
+        const profileResult = await client.renewProfile(getHarvesterPlatformName(cred.platform), cred.accountName);
         if (profileResult?.success) {
           if (profileResult.loggedIn) {
             this.db.credentials.updateCredentialStatus(cred.platform, 'active', 'user_default', cred.accountId);

@@ -1,11 +1,15 @@
 ﻿import type {
+  AICard,
   AudienceSegment,
   ContentGenerationConfig,
   DocumentItem,
+  EnterpriseRawLayer,
   ImageAssetPlan,
   ImageItem,
   KeywordStrategy,
+  KnowledgeBase,
   KnowledgeDocumentPlan,
+  KnowledgeSource,
   PlatformStrategy,
   PromotionGoal,
   SessionData,
@@ -59,6 +63,13 @@ function inferTags(item: string, session: SessionData): string[] {
   return Array.from(new Set(tags.filter(Boolean)));
 }
 
+/**
+ * 从 session.enterprise 的真实字段编译 DocumentItem 的结构化知识内容。
+ *
+ * 这是"编译式 Wiki"的核心——不是从外部文档抽取，而是把对话教练在前几个阶段收集的
+ * 企业画像（产品描述、用户痛点、品牌故事、信任锚点）直接编译成 LLM 可消费的分节知识。
+ * 这样内容生成时不需要向量检索，直接读结构化条目就能引用真实事实。
+ */
 function buildDocumentPlan(items: string[], session: SessionData): DocumentItem[] {
   const requiredDocs = [
     '产品说明书：覆盖产品定位、核心功能、适用人群、典型使用流程',
@@ -68,12 +79,306 @@ function buildDocumentPlan(items: string[], session: SessionData): DocumentItem[
     '行业资料：覆盖市场趋势、用户痛点、方法论和术语解释',
   ];
 
-  return [...items, ...requiredDocs].map((item) => ({
-    title: item,
-    content: `${session.enterprise.fullName || '企业'}知识库资料：${item}`,
-    type: inferDocType(item),
-    tags: inferTags(item, session),
+  return [...items, ...requiredDocs].map((item) => {
+    const type = inferDocType(item);
+    return {
+      title: item,
+      content: `${session.enterprise.fullName || '企业'}知识库资料：${item}`,
+      type,
+      tags: inferTags(item, session),
+      ...compileDocumentSections(type, session, item),
+    };
+  });
+}
+
+/**
+ * 按文档类型 + 标题语义编译结构化 sections / keyFacts / evidence。
+ *
+ * 同一 type 下不同 docTitle 会获得差异化的 sections 组织：
+ *   - product 类：产品说明书（宏观定位）vs 用户手册（操作流程）vs 核心功能详解（技术细节）
+ *   - brand  类：一般只有一条品牌故事，全部内容集中展示
+ *   - faq    类：采购/部署/效果 三问段
+ *   - case   类：场景 → 解决方案 → 预期效果
+ */
+function compileDocumentSections(
+  type: DocumentItem['type'],
+  session: SessionData,
+  docTitle: string = '',
+): Pick<DocumentItem, 'sections' | 'keyFacts' | 'evidence'> {
+  const ent = session.enterprise;
+  const product = ent.products[0];
+  const productName = product?.name || ent.shortName || ent.fullName || '产品';
+
+  if (type === 'product') {
+    // 语义区分：按标题关键字微调 sections 结构
+    const isManual = /手册|操作|指南/.test(docTitle);
+    const isDetailed = /详解|架构|技术|核心功能/.test(docTitle);
+
+    if (isManual) {
+      const sections = [
+        {
+          heading: '快速上手',
+          bullets: [
+            `安装准备：确认 ${productName} 的部署方式（SaaS / 私有化 / Docker）`,
+            `账号创建与权限分配`,
+            `核心功能快捷入口`,
+          ],
+        },
+        {
+          heading: '核心操作流程',
+          bullets: ent.userPainPoints.length > 0
+            ? ent.userPainPoints.map((p) => `流程：围绕"${p}"问题的端到端操作路径`)
+            : ['内容创建 → 审核 → 发布 → 效果追踪'],
+        },
+        {
+          heading: '常见配置项',
+          bullets: [
+            `行业术语与关键词配置（来自词库）`,
+            `多平台发布策略与时间设置`,
+            `品牌调性与内容风格参数`,
+          ],
+        },
+        {
+          heading: '常见问题',
+          bullets: [
+            `数据安全与权限问题`,
+            `性能瓶颈排查建议`,
+            `升级与迁移注意事项`,
+          ],
+        },
+      ];
+
+      const keyFacts = [
+        `${productName} 支持 SaaS / 私有化 / Docker 多种部署方式`,
+        ...(ent.userPainPoints.length > 0
+          ? [ent.userPainPoints[0], ent.userPainPoints[1] || '']
+          : []),
+      ].filter(Boolean);
+
+      return {
+        sections,
+        keyFacts,
+        evidence: [{ source: 'enterprise.profile', claim: `${productName} 用户手册编译条目` }],
+      };
+    }
+
+    if (isDetailed) {
+      const sections = [
+        {
+          heading: '核心能力清单',
+          bullets: ent.products.length > 0
+            ? ent.products.map((p) => {
+                const parts = [p.name];
+                if (p.description && !isKeywordList(p.description)) parts.push(p.description);
+                return parts.join('：');
+              })
+            : ['（待企业补充核心能力描述）'],
+        },
+        {
+          heading: '产品价值',
+          bullets: [
+            ent.description ? ent.description : '（待补充产品价值主张）',
+            ...(ent.trustAnchors.length > 0
+              ? [`信任背书：${ent.trustAnchors.slice(0, 2).join('、')}`]
+              : ['（待补充认证、资质等信任背书）']),
+          ].filter(Boolean),
+        },
+        {
+          heading: '适用场景',
+          bullets: ent.userPainPoints.length > 0
+            ? ent.userPainPoints.map((p) => `场景：企业在"${p}"上的典型需求`)
+            : ['（待补充行业适用场景）'],
+        },
+        {
+          heading: '品牌调性',
+          bullets: ent.brandTone.length > 0
+            ? ent.brandTone
+            : ['（待企业补充品牌调性描述）'],
+        },
+      ];
+
+      const keyFacts = [
+        ent.products.length > 0 ? `覆盖 ${ent.products.length} 个核心产品能力` : null,
+        ent.trustAnchors.length > 0
+          ? `信任锚点：${ent.trustAnchors.slice(0, 2).join('、')}`
+          : null,
+        ent.brandStory ? `品牌故事：${ent.brandStory.slice(0, 80)}` : null,
+      ].filter(Boolean) as string[];
+
+      return {
+        sections,
+        keyFacts,
+        evidence: ent.products.map((p) => ({
+          source: 'enterprise.products',
+          claim: `${productName} / ${p.name}`,
+        })),
+      };
+    }
+
+    // 默认：产品说明书（宏观定位视角）
+    const sections = [
+      {
+        heading: '产品定位',
+        bullets: [
+          `${productName}（${product?.category || '企业级产品'}）`,
+          ent.description || product?.description || '（待补充产品描述）',
+        ].filter(Boolean),
+      },
+      {
+        heading: '核心功能',
+        bullets: ent.products.flatMap((p) => {
+          const parts = [p.name];
+          if (p.description && !isKeywordList(p.description)) parts.push(p.description);
+          return parts;
+        }).filter(Boolean),
+      },
+      {
+        heading: '适用人群与场景',
+        bullets: ent.userPainPoints.length > 0
+          ? ent.userPainPoints.map((p) => `关注"${p}"的企业与团队`)
+          : ['企业内容运营、市场营销团队、自媒体创作者'],
+      },
+      {
+        heading: '品牌调性',
+        bullets: ent.brandTone.length > 0 ? ent.brandTone : ['专业严谨', '务实高效'],
+      },
+    ];
+
+    const keyFacts = [
+      product?.description ? `产品描述：${product.description}` : null,
+      ent.brandStory ? `品牌故事：${ent.brandStory.slice(0, 80)}` : null,
+    ].filter(Boolean) as string[];
+
+    const evidence = [
+      { source: 'enterprise.products', claim: `${productName} 核心产品` },
+      ...(ent.description ? [{ source: 'enterprise.description', claim: ent.description }] : []),
+      ...(ent.brandStory ? [{ source: 'enterprise.brandStory', claim: ent.brandStory.slice(0, 60) }] : []),
+    ];
+
+    return { sections, keyFacts, evidence };
+  }
+
+  if (type === 'brand') {
+    const sections = [
+      {
+        heading: '品牌概览',
+        bullets: [
+          ent.fullName,
+          ent.shortName ? `简称：${ent.shortName}` : null,
+          ent.scale ? `企业规模：${ent.scale}` : null,
+          ent.location ? `所在地：${ent.location}` : null,
+          ent.foundedYear ? `成立年份：${ent.foundedYear}` : null,
+        ].filter(Boolean),
+      },
+      {
+        heading: '品牌故事',
+        bullets: ent.brandStory
+          ? splitSentences(ent.brandStory).slice(0, 4)
+          : ['（待补充品牌故事）'],
+      },
+      {
+        heading: '信任锚点',
+        bullets: ent.trustAnchors.length > 0
+          ? ent.trustAnchors
+          : ['（待补充认证、资质、合作案例等信任背书）'],
+      },
+      {
+        heading: '品牌调性',
+        bullets: ent.brandTone.length > 0
+          ? ent.brandTone
+          : ['专业严谨', '科技创新', '务实高效'],
+      },
+    ];
+
+    const evidence = [
+      ...ent.trustAnchors.map((claim) => ({ source: 'enterprise.trustAnchors', claim })),
+      ...(ent.brandStory ? [{ source: 'enterprise.brandStory', claim: ent.brandStory.slice(0, 60) }] : []),
+    ];
+
+    return { sections, keyFacts: [], evidence };
+  }
+
+  if (type === 'faq') {
+    const painPoints = ent.userPainPoints.length > 0
+      ? ent.userPainPoints
+      : [`如何${productName}？`, `${productName}适合哪些企业？`, `${productName}怎么上手？`];
+
+    const sections = [
+      {
+        heading: '采购与评估',
+        bullets: painPoints.slice(0, 3).map((p) => {
+          const q = `Q: ${productName}能解决"${p}"吗？`;
+          const a = `A: ${productName}专注解决该问题，通过${product?.category || '系统化'}能力落地（具体效果请参考客户案例）。`;
+          return `${q}\n  ${a}`;
+        }),
+      },
+      {
+        heading: '部署与使用',
+        bullets: [
+          `Q: ${productName}支持哪些部署方式？\n  A: 支持 SaaS / 私有化 / Docker 部署（具体以企业交付为准）。`,
+          `Q: ${productName}的学习成本如何？\n  A: 提供用户手册、操作指南和行业最佳实践，新用户可在 1-2 周内上手。`,
+        ],
+      },
+      {
+        heading: '效果与安全',
+        bullets: [
+          `Q: ${productName}的数据安全如何保障？\n  A: 支持企业级数据隔离，关键操作有审计日志（具体合规资质见信任锚点）。`,
+          `Q: 怎么评估 ${productName} 的效果？\n  A: 建议结合 ${session.promotionGoal.targetUsers || '目标用户'} 的关键指标衡量。`,
+        ],
+      },
+    ];
+
+    const keyFacts = painPoints.slice(0, 2).map((p) => `${productName} 核心解决：${p}`);
+
+    const evidence = painPoints.slice(0, 3).map((claim) => ({
+      source: 'enterprise.userPainPoints',
+      claim,
+    }));
+
+    return { sections, keyFacts, evidence };
+  }
+
+  // case — 客户案例
+  const sections = [
+    {
+      heading: '典型应用场景',
+      bullets: ent.userPainPoints.length > 0
+        ? ent.userPainPoints.map((p) => `场景：企业在"${p}"上遇到瓶颈 → 使用 ${productName} 解决`)
+        : [
+            `场景 1：${productName} 帮助企业提升内容产出效率`,
+            `场景 2：${productName} 助力品牌在多平台建立专业影响力`,
+            `场景 3：${productName} 将 ${product?.category || '企业级'} 能力交付给业务团队`,
+          ],
+    },
+    {
+      heading: '预期效果',
+      bullets: [
+        `多平台内容发布效率显著提升（从人工多轮操作到自动流水线）`,
+        `品牌在 ${session.promotionGoal.targetUsers || '目标用户'} 中获得专业话语权`,
+        `内容策略有清晰的数据追踪与迭代闭环`,
+      ],
+    },
+  ];
+
+  const keyFacts = ent.userPainPoints.slice(0, 2).map(
+    (p) => `场景锚点：使用 ${productName} 解决"${p}"痛点`,
+  );
+
+  const evidence = ent.userPainPoints.map((claim) => ({
+    source: 'enterprise.userPainPoints',
+    claim,
   }));
+
+  return { sections, keyFacts, evidence };
+}
+
+/** 把句子拆成短句数组，用于 sections 的 bullets 构造。 */
+function splitSentences(text: string): string[] {
+  return text
+    .split(/[。！？.!?]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 4)
+    .slice(0, 6);
 }
 
 function buildImagePlan(session: SessionData): ImageItem[] {
@@ -484,6 +789,726 @@ ${platforms}
 配置已完成，可以下载产品推广实操手册。`;
 }
 
+// === 三层知识库编译：L1 原料 / L2 信源 / L3 AI 名片 ===
+
+function sanitizeId(text: string): string {
+  return text.replace(/[^\w\u4e00-\u9fa5]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'item';
+}
+
+/** L1：企业原始信息快照，只做原料，不进入引用池。 */
+function compileRawLayer(session: SessionData): EnterpriseRawLayer {
+  const ent = session.enterprise;
+  return {
+    fullName: ent.fullName,
+    shortName: ent.shortName,
+    description: ent.description,
+    scale: ent.scale,
+    location: ent.location,
+    website: ent.website,
+    foundedYear: ent.foundedYear,
+    products: ent.products.map((p) => ({
+      name: p.name,
+      description: p.description,
+      category: p.category,
+    })),
+    brandStory: ent.brandStory,
+    trustAnchors: [...ent.trustAnchors],
+    brandTone: [...ent.brandTone],
+    userPainPoints: [...ent.userPainPoints],
+  };
+}
+
+/**
+ * L2：把 L1 的普通企业信息改造成原子可引用信源。
+ *
+ * 拆分维度：产品能力 / 企业定位 / 品牌故事 / 信任背书 / 痛点问答，
+ * 并保证至少 5 条，使「每篇 6-9 条引用」在 L3 之外仍有足够候选。
+ */
+function compileSources(session: SessionData): KnowledgeSource[] {
+  const ent = session.enterprise;
+  const raw = compileRawLayer(session);
+  const productName = getProductName(session);
+  const industry = getPrimaryIndustry(session);
+  const baseTags = [ent.shortName || ent.fullName, productName, industry].filter(Boolean);
+  const sources: KnowledgeSource[] = [];
+
+  const push = (
+    key: string,
+    title: string,
+    type: KnowledgeSource['type'],
+    sections: Array<{ heading: string; bullets: string[] }>,
+    keyFacts: string[],
+    evidence: Array<{ source: string; claim: string }>,
+    tags: string[] = [],
+  ) => {
+    const cleanSections = sections
+      .map((s) => ({ heading: s.heading, bullets: s.bullets.filter((b) => !!b && b.trim()) }))
+      .filter((s) => s.bullets.length > 0);
+    if (cleanSections.length === 0) return;
+
+    sources.push({
+      id: `l2-${type}-${sanitizeId(key)}`,
+      title,
+      type,
+      layer: 2,
+      tags: Array.from(new Set([...baseTags, ...tags].filter(Boolean))) as string[],
+      sections: cleanSections,
+      keyFacts: keyFacts.filter((f) => !!f && f.trim()),
+      evidence,
+      usageCount: 0,
+      enabled: true,
+    });
+  };
+
+  // 1) 产品能力：每个产品一条
+  ent.products.forEach((p) => {
+    push(
+      p.name,
+      `${p.name} 核心能力`,
+      'capability',
+      [
+        {
+          heading: '能力定位',
+          bullets: [
+            `${p.name}（${p.category || '核心产品'}）`,
+            p.description && !isKeywordList(p.description) ? p.description : '',
+          ],
+        },
+        {
+          heading: '解决的企业问题',
+          bullets: ent.userPainPoints.length > 0
+            ? ent.userPainPoints.slice(0, 3).map((x) => `面向"${x}"的落地能力`)
+            : ['（待企业补充典型使用场景）'],
+        },
+        {
+          heading: '适用场景',
+          bullets: [
+            `适用于关注 ${p.name} 的${industry || '目标'}企业`,
+            ent.scale ? `适配企业规模：${ent.scale}` : '',
+          ],
+        },
+      ],
+      [
+        `产品名称：${p.name}`,
+        p.description && !isKeywordList(p.description) ? p.description : '',
+      ],
+      [{ source: 'enterprise.products', claim: p.name }],
+      ['产品能力'],
+    );
+  });
+
+  // 2) 企业定位与价值主张
+  push(
+    'positioning',
+    '企业定位与价值主张',
+    'brand',
+    [
+      { heading: '企业定位', bullets: [raw.description || `${raw.fullName}的对外定位`] },
+      {
+        heading: '目标客户',
+        bullets: ent.userPainPoints.length > 0
+          ? ent.userPainPoints.map((x) => `关注"${x}"的企业与团队`)
+          : ['（待企业补充目标客户画像）'],
+      },
+      {
+        heading: '品牌调性',
+        bullets: ent.brandTone.length > 0 ? ent.brandTone : ['专业严谨', '务实高效'],
+      },
+    ],
+    [
+      raw.description,
+      ent.brandTone.length > 0 ? `品牌调性：${ent.brandTone.join('、')}` : '',
+    ],
+    [{ source: 'enterprise.description', claim: raw.description }],
+    ['企业定位'],
+  );
+
+  // 3) 品牌故事
+  if (raw.brandStory) {
+    push(
+      'story',
+      '品牌故事',
+      'brand',
+      [
+        { heading: '品牌由来', bullets: splitSentences(raw.brandStory).slice(0, 4) },
+        ...(raw.foundedYear
+          ? [{ heading: '发展历程', bullets: [`成立于 ${raw.foundedYear} 年`] }]
+          : []),
+      ],
+      splitSentences(raw.brandStory).slice(0, 2),
+      [{ source: 'enterprise.brandStory', claim: raw.brandStory.slice(0, 60) }],
+      ['品牌故事'],
+    );
+  }
+
+  // 4) 信任背书：每个锚点一条，便于单独计数与均衡
+  raw.trustAnchors.forEach((anchor, idx) => {
+    push(
+      `proof-${idx}-${anchor}`,
+      `${anchor} 信任背书`,
+      'proof',
+      [{ heading: '背书内容', bullets: [anchor] }],
+      [anchor],
+      [{ source: 'enterprise.trustAnchors', claim: anchor }],
+      ['信任背书'],
+    );
+  });
+
+  // 5) 痛点问答：每个痛点一条
+  raw.userPainPoints.forEach((pain, idx) => {
+    push(
+      `faq-${idx}-${pain}`,
+      `${pain} 解决方案`,
+      'faq',
+      [
+        { heading: '问题', bullets: [`企业普遍面临"${pain}"的问题`] },
+        {
+          heading: '解决方案',
+          bullets: [
+            `${productName} 通过${industry ? `${industry}领域` : '系统化'}能力解决该问题`,
+            '具体效果以客户案例与实测数据为准',
+          ],
+        },
+      ],
+      [`痛点：${pain}`],
+      [{ source: 'enterprise.userPainPoints', claim: pain }],
+      ['痛点问答'],
+    );
+  });
+
+  // 6) 新增维度：service — 服务矩阵（从产品名推导，类似 compileAICard 的 servicesFromProducts）
+  {
+    const servicesFromProducts = ent.products.map((p) => {
+      const base = p.name.replace(/系统|引擎|平台|中台|工具$/g, '').trim() || p.name;
+      return `${base}代运营 / 实施 / 咨询服务`;
+    });
+    const services = servicesFromProducts.length > 0 ? servicesFromProducts : ['（待补充主要服务）'];
+    push(
+      'service-matrix',
+      '主要服务矩阵与交付方式',
+      'service',
+      [
+        { heading: '核心服务', bullets: services },
+        {
+          heading: '交付形式',
+          bullets: ['支持 SaaS / 私有化 / 定制开发多种交付形态', '提供上线培训与持续运营支持'],
+        },
+        {
+          heading: '承诺与保障',
+          bullets: ent.trustAnchors.slice(0, 3),
+        },
+      ],
+      [
+        ...services.slice(0, 2),
+        '支持多种交付形态',
+      ],
+      [{ source: 'enterprise.products → service 推导', claim: services[0] }],
+      ['服务矩阵'],
+    );
+  }
+
+  // 7) 新增维度：customer — 目标客户画像（从 userPainPoints 组合）
+  if (ent.userPainPoints.length > 0) {
+    const customerProfile = ent.userPainPoints.map((p) => `关注「${p}」的客户群体`);
+    push(
+      'customer-profile',
+      '目标客户画像',
+      'customer',
+      [
+        { heading: '核心客户', bullets: customerProfile },
+        {
+          heading: '客户规模',
+          bullets: ent.scale ? [`适配企业规模：${ent.scale}`] : ['（待补充客户规模）'],
+        },
+        {
+          heading: '行业分布',
+          bullets: [industry || '（待补充行业分布）'],
+        },
+      ],
+      [
+        ...customerProfile.slice(0, 2),
+        ent.scale ? `规模：${ent.scale}` : '',
+      ].filter(Boolean),
+      [{ source: 'enterprise.userPainPoints', claim: ent.userPainPoints.join('、') }],
+      ['客户画像'],
+    );
+  }
+
+  // 8) 新增维度：region — 服务地区与本地优势
+  if (ent.location) {
+    push(
+      'region-coverage',
+      '服务地区与本地优势',
+      'region',
+      [
+        { heading: '服务范围', bullets: [`立足 ${ent.location}，服务本地及周边地区，业务辐射全国`] },
+        {
+          heading: '本地优势',
+          bullets: [
+            `深耕 ${ent.location} 区域，积累本地客户服务经验`,
+            ent.location ? `熟悉 ${ent.location} 本地市场环境与行业特性` : '',
+          ],
+        },
+      ],
+      [
+        `服务地区：${ent.location}`,
+        '立足本地，辐射全国',
+      ],
+      [{ source: 'enterprise.location', claim: ent.location }],
+      ['服务地区'],
+    );
+  }
+
+  // 9) 新增维度：pricing — 价格/报价定位（从 trustAnchors 语义识别，有则生成）
+  {
+    const pricingAnchors = ent.trustAnchors.filter(
+      (a) => /价|报价|性价比|透明|免费|试|元|惠|折扣/.test(a),
+    );
+    if (pricingAnchors.length > 0) {
+      push(
+        'pricing-positioning',
+        '价格定位与报价策略',
+        'pricing',
+        [
+          { heading: '报价方式', bullets: pricingAnchors.slice(0, 2) },
+          { heading: '性价比定位', bullets: ['具体报价以实际方案为准，可联系咨询获取定制化方案'] },
+        ],
+        pricingAnchors.slice(0, 2),
+        [{ source: 'enterprise.trustAnchors → pricing 识别', claim: pricingAnchors[0] }],
+        ['价格定位'],
+      );
+    }
+  }
+
+  // 10) 新增维度：partner — 合作伙伴/生态（从 trustAnchors 语义识别，有则生成）
+  {
+    const partnerAnchors = ent.trustAnchors.filter(
+      (a) => /合作|生态|联盟|战略|伙伴|渠道|代理/.test(a),
+    );
+    if (partnerAnchors.length > 0) {
+      push(
+        'partner-ecosystem',
+        '合作伙伴与生态关系',
+        'partner',
+        [
+          { heading: '合作伙伴', bullets: partnerAnchors.slice(0, 3) },
+          { heading: '生态优势', bullets: ['与行业伙伴深度协同，为客户提供完整解决方案'] },
+        ],
+        partnerAnchors.slice(0, 2),
+        [{ source: 'enterprise.trustAnchors → partner 识别', claim: partnerAnchors[0] }],
+        ['合作伙伴'],
+      );
+    }
+  }
+
+  // 兜底：case 维度 — 无条件生成 2 条（行业适用场景 + 交付方式）
+  push(
+    'case-industry',
+    '行业适用场景',
+    'case',
+    [
+      {
+        heading: '行业场景',
+        bullets: [
+          `面向${industry || '目标行业'}企业的典型使用场景`,
+          ent.userPainPoints[0] ? `重点覆盖"${ent.userPainPoints[0]}"场景` : '（待企业补充行业场景）',
+        ],
+      },
+    ],
+    [`行业适用场景：${industry || '目标行业'}`],
+    [{ source: 'enterprise.userPainPoints', claim: ent.userPainPoints[0] || industry || '行业场景' }],
+    ['行业场景'],
+  );
+  push(
+    'case-delivery',
+    '交付与服务方式',
+    'case',
+    [
+      {
+        heading: '交付承诺',
+        bullets: [
+          '支持 SaaS / 私有化 / Docker 多种交付形态',
+          '提供上线培训与持续运营支持',
+        ],
+      },
+    ],
+    ['多种交付形态，持续运营支持'],
+    [{ source: 'enterprise.products → delivery 推导', claim: '多交付形态' }],
+    ['交付服务'],
+  );
+
+  return sources;
+}
+
+/**
+ * L3：AI 名片，每篇文章必须引用。
+ *
+ * 固定 10 个 heading，与 AICard 顶层字段一一对应：
+ *   公司名称 / 公司简介 / 核心产品 / 主要服务 / 服务对象 / 服务地区 /
+ *   经营地址 / 公司网址 / 咨询电话 / 联系邮箱。
+ *
+ * EnterpriseProfile 无 services / serviceRegion 字段，分别从 products / location 推导，
+ * 保证编译式输出无需额外 schema 即可覆盖全部 10 段。
+ */
+function compileAICard(session: SessionData): AICard {
+  const ent = session.enterprise;
+  const productName = getProductName(session);
+
+  // 1. 公司名称
+  const companyName = ent.fullName || ent.shortName || '（待补充公司全称）';
+
+  // 2. 公司简介：description 优先，缺失时退回 brandStory 前 2 句
+  const description =
+    ent.description ||
+    (ent.brandStory ? splitSentences(ent.brandStory).slice(0, 2).join('') : '（待补充公司简介）');
+
+  // 3. 核心产品：固定格式只列产品名（范本：「GEO／AI搜索优化系统、AI智能外呼系统」），
+  //    产品描述留给 L2 capability 信源使用，名片段不拼接
+  const coreProducts: string[] = ent.products.length > 0
+    ? ent.products.map((p) => p.name)
+    : ['（待补充核心产品）'];
+
+  // 4. 主要服务：优先取 enterprise.services 覆盖字段，缺失时从产品名推导 + 信任锚点补充
+  const mainServices: string[] =
+    ent.services && ent.services.length > 0
+      ? ent.services
+      : [
+          ...(ent.products.length > 0
+            ? ent.products.map((p) => {
+                const base = p.name.replace(/系统|引擎|平台|中台|工具$/g, '').trim() || p.name;
+                return `${base}代运营 / 实施 / 咨询服务`;
+              })
+            : ['（待补充主要服务）']),
+          ...ent.trustAnchors.slice(0, 2),
+        ].filter(Boolean);
+
+  // 5. 服务对象：优先取 enterprise.targetCustomers 覆盖字段，缺失时从痛点推导
+  const targetCustomers: string[] =
+    ent.targetCustomers && ent.targetCustomers.length > 0
+      ? ent.targetCustomers
+      : ent.userPainPoints.length > 0
+        ? ent.userPainPoints.slice(0, 3).map((p) => `关注「${p}」的客户`)
+        : ['企业客户', '个人客户'];
+
+  // 6. 服务地区：优先取 enterprise.serviceRegion 覆盖字段，缺失时用 location 扩写
+  const serviceRegion =
+    ent.serviceRegion && ent.serviceRegion.trim()
+      ? ent.serviceRegion.trim()
+      : ent.location
+        ? `立足 ${ent.location}，服务本地及周边地区，业务辐射全国`
+        : '立足本地，服务全国';
+
+  // 7. 经营地址：address 优先，缺失退回 location
+  const address = ent.address || ent.location || '（待补充经营地址）';
+
+  // 8. 公司网址
+  const website = ent.website || '（待补充公司网址）';
+
+  // 9. 咨询电话
+  const phone = ent.phone || '（待补充咨询电话）';
+
+  // 10. 联系邮箱
+  const email = ent.email || '（待补充联系邮箱）';
+
+  const sections: Array<{ heading: string; bullets: string[] }> = [
+    { heading: '公司名称', bullets: [companyName] },
+    { heading: '公司简介', bullets: [description] },
+    { heading: '核心产品', bullets: coreProducts },
+    { heading: '主要服务', bullets: mainServices },
+    { heading: '服务对象', bullets: targetCustomers },
+    { heading: '服务地区', bullets: [serviceRegion] },
+    { heading: '经营地址', bullets: [address] },
+    { heading: '公司网址', bullets: [website] },
+    { heading: '咨询电话', bullets: [phone] },
+    { heading: '联系邮箱', bullets: [email] },
+  ];
+
+  const keyFacts = [
+    companyName,
+    ...coreProducts.slice(0, 2),
+    description.slice(0, 60),
+  ].filter(Boolean);
+
+  const source: KnowledgeSource = {
+    id: 'l3-ai-card',
+    title: 'AI 名片',
+    type: 'brand',
+    layer: 3,
+    tags: [ent.shortName || ent.fullName, productName, ...ent.brandTone.slice(0, 2)]
+      .filter(Boolean) as string[],
+    sections,
+    keyFacts,
+    evidence: [{ source: 'enterprise.aiCard', claim: '由 L1 企业信息编译的 AI 名片' }],
+    usageCount: 0,
+    enabled: true,
+  };
+
+  return {
+    companyName,
+    description,
+    coreProducts,
+    mainServices,
+    targetCustomers,
+    serviceRegion,
+    address,
+    website,
+    phone,
+    email,
+    source,
+  };
+}
+
+/**
+ * 重建时保留既有引用计数。
+ *
+ * 信源 id 由「类型 + 归一化标题」生成，画像内容未变时 id 稳定，
+ * 计数可以延续；画像改写导致标题变化时视为新信源，从 0 开始。
+ */
+function mergeSourceUsage(prev: KnowledgeBase, next: KnowledgeBase): KnowledgeBase {
+  const prevMap = new Map<string, KnowledgeSource>();
+  (prev.sources ?? []).forEach((s) => prevMap.set(s.id, s));
+
+  const sources = (next.sources ?? []).map((s) => {
+    const old = prevMap.get(s.id);
+    return old ? { ...s, usageCount: old.usageCount, lastUsedAt: old.lastUsedAt } : s;
+  });
+
+  let card = next.card;
+  if (card && prev.card) {
+    card = {
+      ...card,
+      source: {
+        ...card.source,
+        usageCount: prev.card.source.usageCount,
+        lastUsedAt: prev.card.source.lastUsedAt,
+      },
+    };
+  }
+
+  return { ...next, sources, card };
+}
+
+export interface SourceSelection {
+  /** 最终选中的信源，L3 名片固定在第 1 位 */
+  selected: KnowledgeSource[];
+  /** 实际选中的 L2 条数 */
+  l2SelectedCount: number;
+  /** L2 候选池大小 */
+  l2CandidateCount: number;
+  /** 候选不足时是否未达到引用下限（允许少引，不硬凑） */
+  underflow: boolean;
+}
+
+function topicTokens(topic: string): string[] {
+  const chunks = topic.split(/[\s,，。、；;：:!?！？/\\|()（）\-—_]+/).filter(Boolean);
+  const tokens = new Set<string>();
+  for (const chunk of chunks) {
+    if (chunk.length <= 6) {
+      tokens.add(chunk);
+      continue;
+    }
+    for (let i = 0; i <= chunk.length - 2; i += 1) tokens.add(chunk.slice(i, i + 2));
+  }
+  return [...tokens];
+}
+
+function scoreRelevance(
+  source: KnowledgeSource,
+  brief: { topic?: string; contentType?: string },
+): number {
+  let score = 0;
+  const topic = brief.topic ?? '';
+  if (topic) {
+    const hay = [source.title, ...source.tags, ...source.keyFacts].join(' ').toLowerCase();
+    for (const token of topicTokens(topic.toLowerCase())) {
+      if (token.length >= 2 && hay.includes(token)) score += 3;
+    }
+  }
+
+  const typeAffinity: Record<string, KnowledgeSource['type'][]> = {
+    faq: ['faq', 'customer'],
+    case: ['case', 'capability', 'service'],
+    comparison: ['capability', 'service', 'pricing', 'product'],
+    popularization: ['brand', 'customer'],
+    whitepaper: ['brand', 'capability', 'partner', 'service'],
+    news: ['brand', 'proof', 'partner', 'region'],
+    guide: ['case', 'service', 'faq', 'customer'],
+    compare: ['capability', 'pricing', 'service'],
+    serviceReview: ['service', 'capability', 'proof'],
+  };
+  if (brief.contentType && (typeAffinity[brief.contentType] ?? []).includes(source.type)) {
+    score += 2;
+  }
+  return score;
+}
+
+/**
+ * 芯图EK · 两阶段组合限制检索（Milvus 混合版）。
+ *
+ * 可选：若提供 milvusCandidateIds（由 Milvus 语义召回返回的信源 id 列表），
+ *       则在 Milvus 候选池内做阶段一（配额）+ 阶段二（差额均衡），
+ *       实现「语义预筛 + usageCount 均衡」混合模式。
+ *       未提供候选池时回退到纯编译式（从全量 L2 里做配额 + 差额均衡）。
+ *
+ * L3 AI 名片仍为每篇必引，不参与配额和差额均衡。
+ */
+
+/** 10 维度弹性配额（每篇 L2 引用允许的最大条数）。可选维度为 0 上限。 */
+const L2_QUOTA: Record<KnowledgeSource['type'], number> = {
+  capability: 3,    // 核心产品能力，最多 3 条
+  service: 2,       // 服务矩阵，最多 2 条
+  brand: 2,         // 品牌定位 + 品牌故事，最多 2 条
+  proof: 2,         // 信任背书，最多 2 条
+  faq: 2,           // 痛点问答，最多 2 条
+  customer: 1,      // 目标客户画像，最多 1 条
+  region: 1,        // 服务地区，最多 1 条
+  case: 2,          // 行业场景 + 交付方式，最多 2 条
+  pricing: 1,       // 价格定位（可选），最多 1 条
+  partner: 1,       // 合作伙伴（可选），最多 1 条
+  product: 0,       // 废弃旧类型，不再分配配额
+};
+
+/**
+ * 阶段一：按维度弹性配额构建候选池。
+ *
+ * 对每个维度，从全量 L2 信源中按 usageCount 升序（少用先用）挑出不超过配额上限的条数。
+ * 这是弹性配额 — 某企业该类型信源不足配额时，有多少挑多少，不凑数。
+ */
+function buildQuotaPool(
+  l2: KnowledgeSource[],
+): KnowledgeSource[] {
+  const byType = new Map<KnowledgeSource['type'], KnowledgeSource[]>();
+  for (const s of l2) {
+    if (!byType.has(s.type)) byType.set(s.type, []);
+    byType.get(s.type)!.push(s);
+  }
+
+  const pool: KnowledgeSource[] = [];
+  for (const [type, list] of byType) {
+    const cap = L2_QUOTA[type] ?? 1;
+    // 同类型内先按 usageCount 升序（少用先用），保证每次都在配额内均衡消耗
+    const sorted = [...list].sort((a, b) => a.usageCount - b.usageCount || a.id.localeCompare(b.id));
+    pool.push(...sorted.slice(0, cap));
+  }
+  return pool;
+}
+
+export function selectCitedSources(
+  session: SessionData,
+  brief: { topic?: string; platform?: string; contentType?: string } = {},
+  options: { min?: number; max?: number; balanceGap?: number; milvusCandidateIds?: string[] } = {},
+): SourceSelection | null {
+  const kb = session.knowledgeBase;
+  const card = kb.card?.source;
+  let l2 = (kb.sources ?? []).filter((s) => s.enabled);
+  if (!card && l2.length === 0) return null;
+
+  // —— Milvus 语义召回候选池预筛 ——
+  // 若提供了候选 id 列表，只在这些候选里选取；未提供则从全量 L2 选取
+  if (options.milvusCandidateIds && options.milvusCandidateIds.length > 0) {
+    const allowed = new Set(options.milvusCandidateIds);
+    const milvusPool = l2.filter((s) => allowed.has(s.id));
+    if (milvusPool.length > 0) {
+      // Milvus 有召回 → 候选池为 Milvus 结果，后续配额和差额均衡在里面做
+      console.log(`[selectCitedSources] Milvus 候选池 ${milvusPool.length} 条（from ${options.milvusCandidateIds.length} hits）`);
+      l2 = milvusPool;
+    } else {
+      // Milvus 没命中任何 L2（极端情况：只召回了 L3），回退到全量
+      console.warn('[selectCitedSources] Milvus 候选池未匹配到任何 L2，回退全量');
+    }
+  }
+
+  const min = options.min ?? 6;
+  const max = options.max ?? 9;
+  const gap = options.balanceGap ?? 3;
+  const l2Upper = Math.max(0, max - (card ? 1 : 0));
+  const l2Lower = Math.max(0, min - (card ? 1 : 0));
+
+  // —— 阶段一：弹性配额过滤 ——
+  const quotaPool = buildQuotaPool(l2);
+
+  // —— 阶段二：差额均衡 ——
+  const minUsage = quotaPool.length > 0 ? Math.min(...quotaPool.map((s) => s.usageCount)) : 0;
+  const eligible = quotaPool.filter((s) => s.usageCount < minUsage + gap);
+
+  const ranked = eligible
+    .map((s) => ({ source: s, score: scoreRelevance(s, brief) }))
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.source.usageCount - b.source.usageCount ||
+        a.source.id.localeCompare(b.source.id),
+    );
+
+  const picked = ranked.slice(0, l2Upper).map((x) => x.source);
+  const selected = card ? [card, ...picked] : picked;
+
+  return {
+    selected,
+    l2SelectedCount: picked.length,
+    l2CandidateCount: quotaPool.length,
+    underflow: picked.length < l2Lower,
+  };
+}
+
+/** 文章生成成功后回写引用计数（会话内独立计数）。 */
+export function recordSourceUsage(session: SessionData, sourceIds: string[]): SessionData {
+  if (sourceIds.length === 0) return session;
+  const ids = new Set(sourceIds);
+  const now = new Date().toISOString();
+  const bump = (s: KnowledgeSource): KnowledgeSource =>
+    ids.has(s.id) ? { ...s, usageCount: s.usageCount + 1, lastUsedAt: now } : s;
+
+  const kb = session.knowledgeBase;
+  return {
+    ...session,
+    knowledgeBase: {
+      ...kb,
+      sources: (kb.sources ?? []).map(bump),
+      card: kb.card ? { ...kb.card, source: bump(kb.card.source) } : undefined,
+    },
+  };
+}
+
+/**
+ * 从 session 当前状态重建知识库全套衍生数据。
+ *
+ * 这是三层知识库的公共重建入口——stage4 首次构建调用它，
+ * profile-review 全量更新 enterprise 后也会调用它来刷新已陈旧的信源。
+ * 重建会保留既有 usageCount（按信源 id 匹配），避免引用计数被重置。
+ *
+ * 不修改 currentStage；调用方负责根据场景决定是否需要推进阶段。
+ */
+export function rebuildKnowledgeBase(
+  session: SessionData,
+  materials: string[] = [],
+): SessionData {
+  const promotionGoal = buildPromotionGoal(session);
+  const nextKnowledgeBase: KnowledgeBase = {
+    documents: buildDocumentPlan(materials, session),
+    images: buildImagePlan(session),
+    tags: buildTags(materials, session),
+    raw: compileRawLayer(session),
+    sources: compileSources(session),
+    card: compileAICard(session),
+  };
+
+  const updated: SessionData = {
+    ...session,
+    promotionGoal,
+    audienceSegments: buildAudienceSegments(session),
+    knowledgeBase: mergeSourceUsage(session.knowledgeBase, nextKnowledgeBase),
+    knowledgePlan: buildKnowledgeDocumentPlan(session),
+    imagePlan: buildImageAssetPlan(session),
+    keywordStrategy: buildKeywordStrategy(session),
+    contentPlaybook: buildContentPlaybook(session),
+    trackingPlan: buildTrackingPlan(),
+  };
+  updated.prompts = buildPlatformPrompts(updated);
+  updated.platforms = buildPlatformStrategies(updated);
+  return updated;
+}
+
 export const knowledgeStage: StageHandler = {
   stage: 'knowledge',
   questions,
@@ -517,25 +1542,8 @@ export const knowledgeStage: StageHandler = {
 
     const userMsg = makeMessage('user', input);
     const materials = splitList(input);
-    const promotionGoal = buildPromotionGoal(session);
-    const updated: SessionData = {
-      ...session,
-      currentStage: 'knowledge',
-      promotionGoal,
-      audienceSegments: buildAudienceSegments(session),
-      knowledgeBase: {
-        documents: buildDocumentPlan(materials, session),
-        images: buildImagePlan(session),
-        tags: buildTags(materials, session),
-      },
-      knowledgePlan: buildKnowledgeDocumentPlan(session),
-      imagePlan: buildImageAssetPlan(session),
-      keywordStrategy: buildKeywordStrategy(session),
-      contentPlaybook: buildContentPlaybook(session),
-      trackingPlan: buildTrackingPlan(),
-    };
-    updated.prompts = buildPlatformPrompts(updated);
-    updated.platforms = buildPlatformStrategies(updated);
+    const updated = rebuildKnowledgeBase(session, materials);
+    updated.currentStage = 'knowledge';
 
     return {
       messages: [userMsg, makeMessage('system', buildKnowledgePlanMessage(updated))],

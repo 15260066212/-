@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { Article, PlatformCredentials, PlatformId, PublishTask } from '@zemingengine/shared';
-import { PublishQueue } from './queue.js';
 import { Publisher } from './publisher.js';
 import { RPAEngine } from './rpa-engine.js';
 import type { PublishResult } from './types.js';
@@ -9,14 +8,14 @@ import { WechatAdapter } from './adapters/wechat.js';
 /** Mock RPAEngine that overrides publish to avoid launching a real browser. */
 class MockRpaEngine extends RPAEngine {
   override async publish(
-    platform: PlatformId,
     article: Article,
     _credentials: PlatformCredentials,
+    _accountId: string,
   ): Promise<PublishResult> {
     return {
       success: true,
-      postId: `mock_rpa_${platform}_${article.id}`,
-      postUrl: `https://example.com/rpa/${platform}/${article.id}`,
+      postId: `mock_rpa_${article.platform}_${article.id}`,
+      postUrl: `https://example.com/rpa/${article.platform}/${article.id}`,
     };
   }
 }
@@ -64,82 +63,6 @@ function createMockTask(overrides: Partial<PublishTask> = {}): PublishTask {
   };
 }
 
-describe('PublishQueue', () => {
-  let queue: PublishQueue;
-
-  beforeEach(() => {
-    queue = new PublishQueue();
-  });
-
-  it('enqueue 应向队列中添加任务', () => {
-    const task = createMockTask();
-    queue.enqueue(task);
-    expect(queue.getPending().length).toBe(1, 'enqueue should add one task to the queue');
-  });
-
-  it('getPending 只返回 pending 状态的任务', () => {
-    const pendingTask = createMockTask({ id: 't1', status: 'pending' });
-    const publishedTask = createMockTask({ id: 't2', status: 'published' });
-    queue.enqueue(pendingTask);
-    queue.enqueue(publishedTask);
-    const pending = queue.getPending();
-    expect(pending.length).toBe(1);
-    expect(pending[0].id).toBe('t1', 'only pending status tasks should be returned');
-  });
-
-  it('getPending 也返回 retrying 状态的任务', () => {
-    const retryingTask = createMockTask({ id: 't1', status: 'retrying' });
-    queue.enqueue(retryingTask);
-    const pending = queue.getPending();
-    expect(pending.length).toBe(1);
-    expect(pending[0].id).toBe('t1', 'retrying tasks should also be considered pending');
-  });
-
-  it('dequeue 按入队顺序取出第一个任务', () => {
-    const task1 = createMockTask({ id: 't1' });
-    const task2 = createMockTask({ id: 't2' });
-    queue.enqueue(task1);
-    queue.enqueue(task2);
-    const dequeued = queue.dequeue();
-    expect(dequeued?.id).toBe('t1');
-    expect(queue.getPending().length).toBe(1, 'after dequeue, one less task should remain pending');
-  });
-
-  it('remove 按 id 移除指定任务', () => {
-    const task1 = createMockTask({ id: 't1' });
-    const task2 = createMockTask({ id: 't2' });
-    queue.enqueue(task1);
-    queue.enqueue(task2);
-    queue.remove('t1');
-    expect(queue.getPending().length).toBe(1);
-    expect(queue.getPending()[0].id).toBe('t2', 'only the specified task should be removed');
-  });
-
-  it('remove 不存在的任务不会报错也不改变队列', () => {
-    const task = createMockTask();
-    queue.enqueue(task);
-    queue.remove('non-existent');
-    expect(queue.getPending().length).toBe(1, 'removing non-existent task should not change queue');
-  });
-
-  it('updateTask 可以更新任务的状态字段', () => {
-    const task = createMockTask({ id: 't1', status: 'pending' });
-    queue.enqueue(task);
-    queue.updateTask('t1', { status: 'retrying' });
-    const updated = queue.getTask('t1');
-    expect(updated?.status).toBe('retrying', 'task status should be updated');
-  });
-
-  it('markProcessing 和 markDone 控制任务处理状态流转', () => {
-    const task = createMockTask({ id: 't1' });
-    queue.enqueue(task);
-    queue.markProcessing('t1');
-    expect(queue.getPending().length).toBe(0, 'processing tasks should not appear in pending list');
-    queue.markDone('t1');
-    expect(queue.getPending().length).toBe(1, 'done tasks should reappear in pending list');
-  });
-});
-
 describe('Publisher.publishArticle', () => {
   it('注册 WechatAdapter 后通过 API 发布文章应返回 success=true', async () => {
     const rpaEngine = new RPAEngine();
@@ -179,17 +102,15 @@ describe('Publisher.publishArticle', () => {
 });
 
 describe('Publisher.createDefault', () => {
-  it('应注册全部 9 个平台适配器（weixin 用 API，其余用 RPA）', () => {
+  it('应注册全部 7 个平台适配器（weixin 用 API，其余用 RPA）', () => {
     const publisher = Publisher.createDefault();
     // weixin should use api method
     expect(publisher.getMethodForPlatform('weixin')).toBe('api');
     // All other platforms should use rpa
     expect(publisher.getMethodForPlatform('zhihu')).toBe('rpa');
-    expect(publisher.getMethodForPlatform('baijia')).toBe('rpa');
     expect(publisher.getMethodForPlatform('toutiao')).toBe('rpa');
     expect(publisher.getMethodForPlatform('csdn')).toBe('rpa');
     expect(publisher.getMethodForPlatform('juejin')).toBe('rpa');
-    expect(publisher.getMethodForPlatform('bilibili')).toBe('rpa');
     expect(publisher.getMethodForPlatform('sohu')).toBe('rpa');
     expect(publisher.getMethodForPlatform('netease')).toBe('rpa', 'all non-weixin platforms should use RPA method');
   });

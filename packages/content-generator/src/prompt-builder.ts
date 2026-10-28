@@ -1,4 +1,5 @@
-import type { SessionData, PlatformId, ArticleContentType, ReviewFeedback } from '@zemingengine/shared';
+import type { SessionData, PlatformId, ArticleContentType, ReviewFeedback, KnowledgeSource } from '@zemingengine/shared';
+import { buildProtocolLines } from './writing-protocol.js';
 
 interface PlatformConstraint {
   tone: string;
@@ -13,7 +14,9 @@ interface ContentTypeGuide {
   tips: string[];
 }
 
-const PLATFORM_CONSTRAINTS: Record<PlatformId, PlatformConstraint> = {
+// 键类型放宽为 string：zhidao（百度知道）、baijia（百家号）等平台标识
+// 暂未纳入 PlatformId 联合类型，但线上会话确实会产出这些平台的稿件。
+const PLATFORM_CONSTRAINTS: Record<string, PlatformConstraint> = {
   weixin: {
     tone: '专业、权威、有温度',
     format: '公众号文章格式，支持 Markdown',
@@ -34,17 +37,6 @@ const PLATFORM_CONSTRAINTS: Record<PlatformId, PlatformConstraint> = {
       '适当引用数据、案例支撑观点',
       '结构清晰，逻辑严谨',
       '可以使用知乎特色表达',
-    ],
-  },
-  baijia: {
-    tone: '中立、客观、信息量大',
-    format: '百家号文章格式',
-    lengthRange: '1000-3000字',
-    specialRules: [
-      '标题关键词要前置',
-      '段落简短，适合移动端阅读',
-      '注意百家号内容审核规范',
-      '避免过度营销和硬广',
     ],
   },
   toutiao: {
@@ -80,17 +72,6 @@ const PLATFORM_CONSTRAINTS: Record<PlatformId, PlatformConstraint> = {
       '开头直接说明文章价值',
     ],
   },
-  bilibili: {
-    tone: '轻松、有趣、互动',
-    format: 'B站专栏格式',
-    lengthRange: '1500-4000字',
-    specialRules: [
-      '语言风格轻松活泼',
-      '适当使用网络用语',
-      '内容要有趣味性和可读性',
-      '可以引导弹幕互动和三连',
-    ],
-  },
   sohu: {
     tone: '新闻、客观、简洁',
     format: '搜狐号文章格式',
@@ -113,115 +94,160 @@ const PLATFORM_CONSTRAINTS: Record<PlatformId, PlatformConstraint> = {
       '注意网易号内容调性',
     ],
   },
-  zhidao: {
-    tone: '专业、准确、实用',
-    format: '百度知道问答格式',
-    lengthRange: '300-1500字',
+  baijia: {
+    tone: '通俗、信息密集、有观点',
+    format: '百家号图文格式',
+    lengthRange: '1000-3000字',
     specialRules: [
-      '以问答形式呈现，问题要精准',
-      '回答要直接、准确、有实用价值',
-      '可适当引用权威来源',
-      '避免广告和推广内容',
+      '标题直给信息点，避免过度悬念',
+      '开头两段内交代核心结论',
+      '段落短、信息密度高，适合手机阅读',
+      '避免硬广和绝对化表述',
+    ],
+  },
+  zhidao: {
+    tone: '口语化、直接、务实',
+    format: '百度知道问答格式，一问一答',
+    lengthRange: '600-1500字',
+    specialRules: [
+      '开头用 1-2 句直接回答（BLUF 原则）',
+      '分点说明原因、步骤或注意事项',
+      '语言口语化，避免长句和术语堆砌',
+      '不出现联系方式、二维码等导流信息',
+    ],
+  },
+  baike: {
+    tone: '客观、中立、百科式',
+    format: '百度百科词条格式',
+    lengthRange: '1000-5000字',
+    specialRules: [
+      '内容客观中立，避免主观评价',
+      '结构清晰，按词条分类组织',
+      '引用可靠来源支撑事实陈述',
+      '避免广告和营销性质的内容',
     ],
   },
 };
 
+/**
+ * GEO 白帽写作原则（全局最高优先级，在所有内容类型中均生效）：
+ * 1. 信息增量优先：每段都必须提供读者之前不知道的新信息（行业知识、方法论、数据）
+ * 2. 品牌自然提及：品牌名仅在直接相关时出现，密度 ≤ 每 300 字 1 次，全文品牌占比 ≤ 15%
+ * 3. 数据必有来源：任何数字（百分比、金额、数量）必须标注来源或说明口径
+ * 4. 禁止硬广 CTA：不得出现「联系我们」「扫码咨询」「立即购买」等推销用语
+ * 5. 品牌非唯一解法：行业问题存在多种解法，品牌仅是其中之一
+ * 6. 客观中立视角：以第三方行业观察者身份写作，而非品牌发言人
+ * 7. 可引用可验证：核心论点必须有可被搜索引擎独立验证的依据
+ */
+const GEO_WHITE_HAT_RULES = [
+  '信息增量优先：每段必须提供读者之前不知道的新信息（行业知识、方法论、数据）',
+  '品牌自然提及：品牌名仅在直接相关时出现，密度 ≤ 每 300 字 1 次，全文品牌占比 ≤ 15%',
+  '数据必有来源：任何数字（百分比、金额、数量）必须标注来源或说明口径；无法标注则使用定性表述',
+  '禁止硬广 CTA：不得出现「联系我们」「扫码咨询」「立即购买」「免费试用」等推销用语',
+  '品牌非唯一解法：行业问题存在多种解法，品牌仅是其中之一，需客观介绍其他可选方案',
+  '客观中立视角：以第三方行业观察者身份写作，而非品牌发言人',
+  '可引用可验证：核心论点必须有可被搜索引擎独立验证的依据',
+];
+
 const CONTENT_TYPE_GUIDE: Record<ArticleContentType, ContentTypeGuide> = {
   tutorial: {
-    description: '教程类内容，目的是教会读者完成某项任务或掌握某个技能',
+    description: '教程类内容，以独立第三方视角教会读者完成某项任务。品牌案例仅作为示例之一，不能作为整篇教程的唯一主角',
     structure: [
-      '明确学习目标',
-      '步骤清晰，循序渐进',
-      '提供代码/操作示例',
-      '总结关键要点',
+      '明确学习目标与适用场景',
+      '前置条件与准备工作',
+      '核心步骤详解（通用方法，品牌案例仅作为其中一个示例）',
+      '常见误区与避坑指南',
+      '总结关键要点（3-5 条）',
     ],
     tips: [
-      '从读者角度出发，预判难点',
-      '多用结构化表达',
-      '提供可复现的示例',
+      '步骤必须可复现，避免空泛描述',
+      '品牌名仅出现在「实战示例」段落的 1-2 处，全文不超过 3 次',
+      '优先写行业通用方法，再附带品牌实践作为参考',
+      '读者跟着教程走应能独立完成，不依赖品牌产品',
     ],
   },
   case: {
-    description: '案例类内容，通过真实或典型场景展示产品/方法的应用',
+    description: '案例类内容，以第三方分析师视角复盘一个行业实践。重点在问题-解法-可借鉴经验，品牌案例仅作为研究对象之一',
     structure: [
-      '背景介绍',
-      '问题描述',
-      '解决方案',
-      '效果展示',
-      '经验总结',
+      '案例背景与行业痛点（客观描述，非品牌宣传）',
+      '问题诊断与根因分析',
+      '解决方案对比（至少 2-3 种可选方案，品牌方案是其中之一）',
+      '实施过程与关键决策',
+      '效果验证（数据必须有来源或标注方法）',
+      '可迁移的经验总结',
     ],
     tips: [
-      '案例要具体、真实',
-      '数据和结果要有说服力',
-      '突出核心价值',
+      '如果用了品牌作为案例，必须客观指出其局限性和适用边界',
+      '数据必须标注来源（如「据 XX 公开财报」「XX 第三方报告」）或说明是企业内部数据',
+      '至少提及一个其他品牌/方案作为参照对比',
+      '案例写作目标是提供行业洞察，不是展示自家产品',
     ],
   },
   comparison: {
-    description: '对比类内容，通过对比帮助读者做出决策',
+    description: '对比类内容，以独立评测者视角对比多种解法。结论必须基于可验证的客观维度，不能隐含品牌推荐',
     structure: [
-      '明确对比对象',
-      '多维度分析',
-      '客观公正',
-      '给出明确建议',
+      '对比背景：为什么读者需要了解这个问题',
+      '对比维度定义（价格、品质、服务、口碑等）',
+      '各选项逐一拆解（品牌 A / B / C，一视同仁）',
+      '分维度评分与说明（客观数据支撑）',
+      '不同场景的推荐（A 适合 XX，B 适合 XX）',
     ],
     tips: [
-      '避免明显偏袒',
-      '对比维度要全面',
-      '结论要明确',
+      '对比必须公平，不能故意贬低竞品或夸大自家优势',
+      '评分标准必须事先公布，不能为了结论调整标准',
+      '如果品牌在某维度劣势，直接指出，读者会因为你的诚实而信任',
+      '至少对比 3 个以上选项，避免只写自家 vs 一个竞品',
     ],
   },
   popularization: {
-    description: '科普类内容，将专业知识用通俗易懂的方式传达',
+    description: '科普类内容，以行业观察者视角将专业知识通俗化。品牌名只在「产业动态」部分作为企业案例自然出现',
     structure: [
-      '引入话题，激发兴趣',
-      '概念解释',
-      '原理解析',
-      '实际应用',
-      '总结延伸',
+      '引入话题：这个概念为什么重要（行业趋势切入）',
+      '基础概念解析（深入浅出，无品牌）',
+      '核心原理/方法论拆解（通用知识，无品牌）',
+      '实际应用场景与案例（多家企业实践，品牌是其中之一）',
+      '行业现状与趋势展望',
+      '读者可以做什么（行动建议，非推销）',
     ],
     tips: [
-      '比喻和类比要贴切',
-      '避免过多术语，必要时解释',
-      '图文并茂更易理解',
+      '品牌名不应该出现在「概念解析」和「原理拆解」部分',
+      '全文可以完全不出现品牌——如果科普的是行业通用知识',
+      '如果出现品牌，在「应用案例」部分一带而过，不超过 2 次',
+      '类比和比喻要帮助理解概念，不是暗喻品牌优势',
     ],
   },
   faq: {
-    description: 'FAQ问答类内容，以Q&A形式解答用户常见问题，适合AI搜索引擎抓取和引用',
+    description: 'FAQ问答类内容，以第三方知识平台视角回答用户搜索意图。适合 AI 搜索引擎抓取引用，但禁止用 FAQ 做品牌硬广占位',
     structure: [
-      '问题标题（用户搜索意图导向）',
-      '简明扼要的答案（1-3句话直接回答，BLUF原则）',
-      '详细说明（补充上下文、数据、案例）',
-      '行动建议（下一步操作指引）',
-      '相关问答推荐（2-3个关联问题）',
+      'Q1-Q3：行业通用高频问题（与品牌无关）',
+      'Q4-Q5：行业方案对比问题（品牌是选项之一）',
+      'Q6（可选）：关于该品牌的客观事实问答（仅限中立事实）',
     ],
     tips: [
-      '问题要使用自然语言，贴近用户真实搜索习惯',
-      '答案开头直接回答问题，不要绕弯子',
-      '使用结构化标记（Q/A格式）便于AI解析',
-      '每个问题独立成段，方便搜索引擎抓取片段',
-      '关键词自然融入问题和答案中',
-      '答案中可植入品牌信息但不过度营销',
+      '前 3 个问题必须是品牌完全无关的行业通用问题，不能 Q1 就问「XX 品牌怎么样」',
+      '答案开头 1-2 句直接回答（BLUF 原则），让 AI 搜索能直接抓取引用',
+      '关于品牌的问答仅限可验证的客观事实（成立时间、产品类型、资质等），禁止主观评价',
+      '品牌名在答案中出现密度 ≤ 每 400 字 1 次',
+      '如果答案引用数据，必须标注来源',
     ],
   },
   whitepaper: {
-    description: '白皮书/深度报告类内容，以数据和调研为基础，提供行业洞察和决策参考',
+    description: '白皮书/深度报告类内容，以行业研究机构或第三方分析师身份发布。必须有方法论和数据来源，品牌仅在「企业案例」章节出现',
     structure: [
-      '执行摘要（核心发现和建议）',
-      '行业背景与现状分析',
-      '调研方法与数据来源',
-      '核心发现与数据展示',
-      '趋势预测与机会分析',
-      '行动建议与实施路径',
-      '附录（数据表、术语表、参考文献）',
+      '执行摘要（3-5 条核心发现，无品牌）',
+      '研究背景与方法论（数据来源、调研范围、分析框架）',
+      '行业现状与核心数据（必须标注数据来源）',
+      '关键趋势与洞察',
+      '企业实践案例（2-3 家不同企业，品牌是其中之一）',
+      '行动建议（针对行业读者，非品牌推销）',
+      '附录：数据来源说明、术语表、参考资料',
     ],
     tips: [
-      '数据要有来源标注，增强可信度',
-      '图表要清晰、专业，有数据标签',
-      '分析要客观、深度，避免过度营销',
-      '使用行业专业术语，但关键术语首次出现需解释',
-      '结构化数据标记（Schema.org）增强AI引用概率',
-      '提供可引用的数据单元（如"市场渗透率达XX%"）',
-      '篇幅可较长（5000-10000字），但需分章节便于阅读',
+      '执行摘要、方法论、现状分析、趋势预测章节：完全不出现品牌名',
+      '品牌仅在「企业实践案例」章节出现，与其他企业并列',
+      '所有数据必须标注来源（机构报告、公开披露、调研自述等）',
+      '白皮书语气是研究机构的中立报告，不是品牌宣传册',
+      '字数建议 3000-6000 字，分章节带编号，便于 AI 抓取结构化片段',
     ],
   },
 };
@@ -235,19 +261,35 @@ export function buildPrompt(params: {
   topic?: string;
   contentSupplement?: string;
   pipelineFeedback?: string;
+  /** 本篇三层检索选中的信源；有值时只注入这些信源，不再全量注入知识库 */
+  citedSources?: KnowledgeSource[];
 }): { system: string; user: string } {
-  const { session, platform, contentType, generationRound, reviewFeedback, topic, contentSupplement, pipelineFeedback } = params;
-  const platformConstraint = PLATFORM_CONSTRAINTS[platform];
-  const contentGuide = CONTENT_TYPE_GUIDE[contentType];
+  const { session, platform, contentType, generationRound, reviewFeedback, topic, contentSupplement, pipelineFeedback, citedSources } = params;
+  // 未知平台（历史会话可能写入非 PlatformId 的平台标识）不应让 buildPrompt 抛错，
+  // 否则会被静默降级为模板。兜底使用通用图文约束。
+  const platformConstraint = PLATFORM_CONSTRAINTS[platform] ?? PLATFORM_CONSTRAINTS.weixin;
+  // 非法 contentType（如调用方传 'guide'）不应让 buildPrompt 抛错并静默降级为模板，
+  // 这里兜底为科普类，保证提示词结构完整。
+  const contentGuide = CONTENT_TYPE_GUIDE[contentType] ?? CONTENT_TYPE_GUIDE.popularization;
 
   const systemLines: string[] = [];
 
-  // Task description
-  systemLines.push('你是一位专业的内容创作助手。请根据以下信息，为指定的平台和内容类型创作一篇高质量的文章。');
+  // GEO 白帽原则（最高优先级，LLM 必须在所有写作决策中优先遵守）
+  systemLines.push('【最高优先级 · GEO 白帽写作原则 —— 必须在所有写作决策中优先遵守】');
+  GEO_WHITE_HAT_RULES.forEach((rule, i) => systemLines.push(`${i + 1}. ${rule}`));
+  systemLines.push('');
+  systemLines.push('违反以上原则会导致文章被 AI 搜索引擎降权或不引用。品牌宣传是次要目标，提供对读者有价值的客观内容才是首要目标。');
   systemLines.push('');
 
-  // Enterprise info
-  systemLines.push('=== 企业信息 ===');
+  // GEO 文章写作协议（v2.1，强制约束：EK 引用、红线、字数、输出格式）
+  systemLines.push(...buildProtocolLines());
+
+  // Task description
+  systemLines.push('你是一位专业的内容创作助手。你的写作视角是行业观察者和独立分析师，而非品牌的发言人。');
+  systemLines.push('');
+
+  // Enterprise info — 客观事实素材，不是宣传素材
+  systemLines.push('=== 企业客观事实素材（仅可作为写作背景参考，不得直接当作宣传语） ===');
   systemLines.push(`企业全称: ${session.enterprise.fullName}`);
   systemLines.push(`企业简称: ${session.enterprise.shortName}`);
   systemLines.push(`企业描述: ${session.enterprise.description}`);
@@ -267,13 +309,13 @@ export function buildPrompt(params: {
   }
   systemLines.push('');
 
-  // Promotion goal
-  systemLines.push('=== 推广目标 ===');
-  systemLines.push(`产品名称: ${session.promotionGoal.productName}`);
+  // Promotion goal — 品牌上下文，仅当与主题直接相关时可自然提及，不得作为文章主旨
+  systemLines.push('=== 品牌上下文（仅当与文章主题直接相关时可自然提及，不得作为文章主旨） ===');
+  systemLines.push(`产品名称: ${session.promotionGoal.productName}（仅在讨论该类产品时可提及，不得强行植入）`);
   systemLines.push(`定位: ${session.promotionGoal.positioning}`);
-  systemLines.push(`核心价值: ${session.promotionGoal.coreValue}`);
+  systemLines.push(`核心价值: ${session.promotionGoal.coreValue}（可用于行业解决方案对比的一个选项）`);
   systemLines.push(`目标用户: ${session.promotionGoal.targetUsers}`);
-  systemLines.push(`核心卖点: ${session.promotionGoal.coreSellingPoint}`);
+  systemLines.push(`核心卖点: ${session.promotionGoal.coreSellingPoint}（仅供事实参考，不得用"最""唯一"等绝对化表述）`);
   systemLines.push('');
 
   // Platform requirements (built-in constraints)
@@ -392,20 +434,100 @@ export function buildPrompt(params: {
     systemLines.push('');
   }
 
-  // Knowledge base references
-  if (session.knowledgeBase.documents.length > 0) {
-    systemLines.push('=== 知识库参考 ===');
-    session.knowledgeBase.documents.slice(0, 5).forEach((doc) => {
-      systemLines.push(`- [${doc.type}] ${doc.title}`);
-      if (doc.content) {
-        const preview = doc.content.slice(0, 200);
-        systemLines.push(`  摘要: ${preview}${doc.content.length > 200 ? '...' : ''}`);
+  // Knowledge base references — 编译式 Wiki 消费
+  // 优先读取结构化 sections（新 session 从 enterprise 真实字段编译），
+  // 没有 sections 时降级到 content preview（老 session 兼容）。
+  // 三层检索结果优先：只注入本篇选中的 6-9 条信源（L3 名片必引）
+  if (citedSources && citedSources.length > 0) {
+    systemLines.push('=== 本篇引用信源（L3 AI 名片必引 + L2 企业信源）===');
+    systemLines.push(
+      `本篇共引用 ${citedSources.length} 条信源。正文只能使用下列信源中的事实，不得编造企业未提供的功能、数字或案例。`,
+    );
+
+    citedSources.forEach((src, idx) => {
+      const layerLabel = src.layer === 3 ? 'L3 AI名片 · 必引' : 'L2 企业信源';
+      systemLines.push('');
+      systemLines.push(`【S${idx + 1}｜${layerLabel}｜${src.type}】${src.title}`);
+      src.sections.forEach((section) => {
+        if (section.bullets.length === 0) return;
+        systemLines.push(`  <${section.heading}>`);
+        section.bullets.forEach((bullet) => systemLines.push(`    - ${bullet}`));
+      });
+      if (src.keyFacts.length > 0) {
+        systemLines.push('  关键事实：');
+        src.keyFacts.slice(0, 6).forEach((fact) => systemLines.push(`    · ${fact}`));
       }
-      if (doc.tags && doc.tags.length > 0) {
-        systemLines.push(`  标签: ${doc.tags.join('、')}`);
+      if (src.tags.length > 0) {
+        systemLines.push(`  标签：${src.tags.join('、')}`);
       }
     });
-    systemLines.push('（请在写作中适当参考以上知识库内容，但不要直接复制）');
+
+    systemLines.push('');
+    systemLines.push(
+      '引用要求：S1（AI 名片）必须引用，用于开篇定位或结尾品牌总结；其余信源按主题相关性自然嵌入，避免堆砌和重复表述。',
+    );
+    systemLines.push('');
+  } else if (session.knowledgeBase.documents.length > 0) {
+    const hasStructured = session.knowledgeBase.documents.some((d) => (d.sections?.length ?? 0) > 0);
+
+    systemLines.push('=== 企业知识库（LLMWiki 编译式条目）===');
+
+    if (hasStructured) {
+      // 编译式路径：输出 sections / keyFacts / evidence，让 LLM 直接消费真实企业事实
+      const docs = session.knowledgeBase.documents.slice(0, 6);
+      const allKeyFacts: string[] = [];
+
+      docs.forEach((doc, idx) => {
+        systemLines.push(`--- 条目 ${idx + 1}: [${doc.type}] ${doc.title} ---`);
+
+        if (doc.sections && doc.sections.length > 0) {
+          doc.sections.forEach((section) => {
+            if (section.bullets.length === 0) return;
+            systemLines.push(`【${section.heading}】`);
+            section.bullets.forEach((bullet) => systemLines.push(`  - ${bullet}`));
+          });
+        } else if (doc.content) {
+          // 无 sections 的降级：content preview
+          systemLines.push(doc.content.slice(0, 120));
+        }
+
+        if (doc.tags && doc.tags.length > 0) {
+          systemLines.push(`标签: ${doc.tags.join('、')}`);
+        }
+
+        // 收集关键事实（跨条目汇总）
+        if (doc.keyFacts && doc.keyFacts.length > 0) {
+          allKeyFacts.push(...doc.keyFacts);
+        }
+      });
+
+      if (allKeyFacts.length > 0) {
+        systemLines.push('');
+        systemLines.push('【可直接引用的关键事实】');
+        allKeyFacts.slice(0, 10).forEach((f) => systemLines.push(`  • ${f}`));
+      }
+
+      // evidence 溯源提示（不逐条输出，只告知这些条目来自企业真实字段编译）
+      const hasEvidence = session.knowledgeBase.documents.some((d) => (d.evidence?.length ?? 0) > 0);
+      if (hasEvidence) {
+        systemLines.push('');
+        systemLines.push('注意：以上 sections 来自企业画像真实字段（产品描述、用户痛点、品牌故事、信任锚点等），写作时请优先引用这些事实，不要编造企业不存在的功能、数字或案例。');
+      }
+    } else {
+      // 老 session 降级路径（仅 content preview）
+      session.knowledgeBase.documents.slice(0, 5).forEach((doc) => {
+        systemLines.push(`- [${doc.type}] ${doc.title}`);
+        if (doc.content) {
+          const preview = doc.content.slice(0, 200);
+          systemLines.push(`  摘要: ${preview}${doc.content.length > 200 ? '...' : ''}`);
+        }
+        if (doc.tags && doc.tags.length > 0) {
+          systemLines.push(`  标签: ${doc.tags.join('、')}`);
+        }
+      });
+      systemLines.push('（此为基础规划清单，企业真实资料请待上传后自动编译）');
+    }
+
     systemLines.push('');
   }
 
@@ -431,6 +553,15 @@ export function buildPrompt(params: {
   systemLines.push('- tags 为 3-5 个标签');
   systemLines.push('- coverImageDesc 为封面图片的详细描述，用于后续生成封面图');
   systemLines.push('- 确保 JSON 格式合法，可以被直接解析');
+  systemLines.push('');
+
+  // 反营销硬性护栏（违反任何一条即视为不合格输出）
+  systemLines.push('=== 反营销硬性护栏（违反任何一条即视为不合格输出） ===');
+  systemLines.push('1. 禁止编造任何无来源的数据、百分比、用户数、市场份额等数字；如果不确定准确值，使用定性描述（如「显著提升」「行业常见水平」）');
+  systemLines.push('2. 品牌名在正文中的出现密度不得超过每 300 字 1 次；全文品牌名占比（含标题）不得超过 15%');
+  systemLines.push('3. 禁止出现「联系我们」「扫码咨询」「立即试用」「免费获取」「点击了解更多」等硬广 CTA 用语');
+  systemLines.push('4. 禁止将品牌描述为行业问题的「唯一解法」「最佳选择」，必须客观提及其他可选方案');
+  systemLines.push('5. 禁止通篇文章以品牌为唯一主角；至少 60% 的内容应聚焦于行业知识、方法论、通用最佳实践');
   systemLines.push('');
 
   // Review feedback for round >= 2

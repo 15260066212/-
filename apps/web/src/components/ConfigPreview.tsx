@@ -42,7 +42,11 @@ export function ConfigPreview({ sessionData, onExportJson }: Props) {
     wordBank.industryTerms.length > 0 ||
     wordBank.prefixes.length > 0 ||
     wordBank.suffixes.length > 0;
-  const hasKnowledge = knowledgeBase.documents.length > 0 || knowledgeBase.tags.length > 0;
+  const hasKnowledge =
+    knowledgeBase.documents.length > 0 ||
+    knowledgeBase.tags.length > 0 ||
+    (knowledgeBase.sources?.length ?? 0) > 0 ||
+    !!knowledgeBase.card;
   const hasPrompts = prompts.length > 0;
   const hasPlatforms = platforms.length > 0;
   const hasManualPlan =
@@ -167,22 +171,134 @@ export function ConfigPreview({ sessionData, onExportJson }: Props) {
 
       {/* 4. Knowledge Base */}
       <CollapsibleSection
-        title="知识库"
+        title="企业知识库（三层）"
         icon="📖"
         defaultOpen={currentStageIndex >= 4 && currentStageIndex <= 5}
         hasData={hasKnowledge}
       >
+        {knowledgeBase.card && (
+          <div className="mb-2 rounded border border-blue-100 bg-blue-50/60 p-2">
+            <div className="flex items-center gap-1 mb-1">
+              <span className="px-1 py-0.5 bg-blue-600 text-white rounded text-xs">L3</span>
+              <span className="text-xs font-medium text-gray-700">AI 名片 · 每篇必引</span>
+              <span className="ml-auto px-1 py-0.5 bg-white text-blue-600 rounded text-xs">
+                引用 {knowledgeBase.card.source.usageCount} 次
+              </span>
+            </div>
+            <div className="text-sm text-gray-800 font-medium truncate">{knowledgeBase.card.companyName}</div>
+            <div className="text-xs text-gray-600 mt-0.5 line-clamp-2">{knowledgeBase.card.description}</div>
+            {(knowledgeBase.card.coreProducts?.length ?? 0) > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {knowledgeBase.card.coreProducts!.slice(0, 3).map((p, i) => (
+                  <span key={i} className="px-1.5 py-0.5 bg-white text-gray-600 rounded text-xs">{p}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {(knowledgeBase.sources?.length ?? 0) > 0 && (
+          <div className="mb-2">
+            <div className="text-xs text-gray-400 mb-1">
+              L2 可引用信源（{knowledgeBase.sources!.length} 条）
+            </div>
+            {knowledgeBase.sources!.map((src, i) => (
+              <details key={src.id} className="text-sm text-gray-600 mb-1 group">
+                <summary className="flex items-start gap-1 cursor-pointer list-none hover:text-gray-800">
+                  <span className="text-gray-400 shrink-0">{i + 1}.</span>
+                  <span className="truncate flex-1 text-left">{src.title}</span>
+                  <span className="px-1 py-0.5 bg-gray-100 text-gray-500 rounded text-xs shrink-0">{src.type}</span>
+                  <span
+                    className={`px-1 py-0.5 rounded text-xs shrink-0 ${
+                      src.usageCount > 0 ? 'bg-amber-50 text-amber-600' : 'bg-gray-50 text-gray-400'
+                    }`}
+                  >
+                    引用 {src.usageCount}
+                  </span>
+                  <svg
+                    className="w-3.5 h-3.5 text-gray-400 shrink-0 group-open:rotate-180 transition-transform mt-0.5"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div className="ml-6 mt-1.5 space-y-1.5 text-xs">
+                  {src.sections.map((section, si) => (
+                    section.bullets.length > 0 && (
+                      <div key={si}>
+                        <div className="font-medium text-gray-500">{section.heading}</div>
+                        <ul className="list-disc list-inside text-gray-600 space-y-0.5">
+                          {section.bullets.map((b, bi) => <li key={bi} className="truncate">{b}</li>)}
+                        </ul>
+                      </div>
+                    )
+                  ))}
+                  {src.keyFacts.length > 0 && (
+                    <div>
+                      <div className="font-medium text-amber-600 mt-1">关键事实</div>
+                      <ul className="list-disc list-inside text-amber-700/80 space-y-0.5">
+                        {src.keyFacts.map((f, fi) => <li key={fi} className="truncate">{f}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </details>
+            ))}
+          </div>
+        )}
+
         {knowledgeBase.documents.length > 0 && (
           <div className="mb-2">
             <div className="text-xs text-gray-400 mb-1">文档素材</div>
             {knowledgeBase.documents.map((doc, i) => (
-              <div key={i} className="text-sm text-gray-600 mb-1 flex items-start gap-1">
-                <span className="text-gray-400 shrink-0">{i + 1}.</span>
-                <span className="truncate">{doc.title || doc.content.slice(0, 50)}</span>
-                <span className="px-1 py-0.5 bg-gray-100 text-gray-500 rounded text-xs shrink-0">
-                  {doc.type}
-                </span>
-              </div>
+              <details key={i} className="text-sm text-gray-600 mb-1 group">
+                <summary className="flex items-start gap-1 cursor-pointer list-none hover:text-gray-800">
+                  <span className="text-gray-400 shrink-0">{i + 1}.</span>
+                  <span className="truncate flex-1 text-left">{doc.title || doc.content.slice(0, 50)}</span>
+                  <span className="px-1 py-0.5 bg-gray-100 text-gray-500 rounded text-xs shrink-0">
+                    {doc.type}
+                  </span>
+                  {(doc.sections?.length ?? 0) > 0 && (
+                    <span className="px-1 py-0.5 bg-blue-50 text-blue-600 rounded text-xs shrink-0">
+                      Wiki
+                    </span>
+                  )}
+                  <svg
+                    className="w-3.5 h-3.5 text-gray-400 shrink-0 group-open:rotate-180 transition-transform mt-0.5"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                {(doc.sections?.length ?? 0) > 0 ? (
+                  <div className="ml-6 mt-1.5 space-y-1.5 text-xs">
+                    {doc.sections!.map((section, si) => (
+                      section.bullets.length > 0 && (
+                        <div key={si}>
+                          <div className="font-medium text-gray-500">{section.heading}</div>
+                          <ul className="list-disc list-inside text-gray-600 space-y-0.5">
+                            {section.bullets.map((b, bi) => <li key={bi} className="truncate">{b}</li>)}
+                          </ul>
+                        </div>
+                      )
+                    ))}
+                    {(doc.keyFacts?.length ?? 0) > 0 && (
+                      <div>
+                        <div className="font-medium text-amber-600 mt-1">关键事实</div>
+                        <ul className="list-disc list-inside text-amber-700/80 space-y-0.5">
+                          {doc.keyFacts!.map((f, fi) => <li key={fi} className="truncate">{f}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  doc.content && doc.content.length > 30 && (
+                    <div className="ml-6 mt-1 text-xs text-gray-400 italic truncate">
+                      {doc.content.slice(0, 120)}
+                    </div>
+                  )
+                )}
+              </details>
             ))}
           </div>
         )}

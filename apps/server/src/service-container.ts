@@ -27,6 +27,7 @@ import { createProfileRoutes } from './routes/profiles.js';
 import { createMonitorRoutes } from './routes/monitor.js';
 import { createCompetitorMonitorRoutes } from './routes/competitor-monitor.js';
 import { createOptimizationPlanRoutes } from './routes/optimization-plan.js';
+import { createKnowledgeRoutes } from './routes/knowledge.js';
 import { createUserRoutes } from './routes/user.js';
 import { createAuthRoutes } from './routes/auth.js';
 import { createNodeRoutes } from './routes/nodes.js';
@@ -151,6 +152,8 @@ export function createServices(): ServiceContainer {
   // 前端构建产物调用的是 /api/optimization-plan/*；缺这条别名会 404 返回纯文本，
   // 前端 resp.json() 解析失败后统一提示"无法连接到服务器"。
   app.route('/api/optimization-plan', createOptimizationPlanRoutes(db));
+  // 芯图EK · 企业知识库（L2 信源 / L3 名片 / 信源组合引用统计）
+  app.route('/api/knowledge', createKnowledgeRoutes(db));
 
   const webDist = resolve(import.meta.dirname, '../../web/dist');
   app.use('/*', async (c, next) => {

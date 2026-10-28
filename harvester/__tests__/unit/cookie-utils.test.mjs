@@ -191,12 +191,9 @@ describe('cookie-utils', () => {
       expect(getAuthCookieNames('zhihu')).toEqual(['z_c0']);
     });
 
-    it('returns correct cookies for baijiahao', () => {
-      expect(getAuthCookieNames('baijiahao')).toEqual(['BDUSS', 'STOKEN']);
-    });
-
-    it('returns correct cookies for zhidao (same as baijiahao)', () => {
-      expect(getAuthCookieNames('zhidao')).toEqual(['BDUSS', 'STOKEN']);
+    it('returns empty array for removed platforms (baijiahao/zhidao)', () => {
+      expect(getAuthCookieNames('baijiahao')).toEqual([]);
+      expect(getAuthCookieNames('zhidao')).toEqual([]);
     });
 
     it('returns correct cookies for csdn', () => {

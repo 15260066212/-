@@ -1,10 +1,25 @@
 import crypto from 'node:crypto';
 import type { DB } from '../db.js';
 import type { PlatformCredentials } from '@zemingengine/shared';
+import { getCanonicalPlatformId } from '@zemingengine/shared';
 import { encryptJSON, decryptJSON } from '@zemingengine/account-vault';
 
 const ENCRYPTION_PREFIX = 'enc:';
 const LEGACY_SALT = 'geo-account-vault-v1';
+
+// === Repository Constants ===
+/** AES-256 key length in bytes for scrypt derivation */
+const ENCRYPTION_KEY_BYTE_LENGTH = 32;
+/** Default browser session max age in hours (7 days) */
+const DEFAULT_SESSION_MAX_AGE_HOURS = 168;
+/** Default credential health check interval (6 hours in milliseconds) */
+const DEFAULT_CREDENTIAL_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+/** Default batch size for credential health checks */
+const DEFAULT_HEALTH_CHECK_BATCH_SIZE = 3;
+/** Default limit for health log queries */
+const DEFAULT_HEALTH_LOGS_LIMIT = 50;
+/** Default limit for relogin log queries */
+const DEFAULT_RELOGIN_LOGS_LIMIT = 50;
 
 function decryptWithLegacySalt(ciphertext: string): Record<string, string> {
   const raw = ciphertext.startsWith(ENCRYPTION_PREFIX)
@@ -13,7 +28,7 @@ function decryptWithLegacySalt(ciphertext: string): Record<string, string> {
   const parts = raw.split(':');
   if (parts.length !== 3) throw new Error('Invalid ciphertext format');
   const passphrase = process.env.ACCOUNT_VAULT_KEY || process.env.CREDENTIAL_ENCRYPTION_KEY || 'dev-only-encryption-key';
-  const key = crypto.scryptSync(passphrase, LEGACY_SALT, 32);
+  const key = crypto.scryptSync(passphrase, LEGACY_SALT, ENCRYPTION_KEY_BYTE_LENGTH);
   const iv = Buffer.from(parts[0], 'base64');
   const encrypted = Buffer.from(parts[1], 'base64');
   const tag = Buffer.from(parts[2], 'base64');
@@ -26,9 +41,19 @@ export class CredentialRepository {
   constructor(private db: DB) {}
 
   /**
+   * Normalize platform naming variants (harvesterName/llmwikiName/sessionName)
+   * to the canonical internal platform id, so 'toutiaohao' and 'toutiao'
+   * converge on a single credential row.
+   */
+  private canonical(platform: string): string {
+    return getCanonicalPlatformId(platform);
+  }
+
+  /**
    * Upsert a credential. If accountId is not provided, defaults to 'default'.
    */
   upsertCredential(platform: string, cred: PlatformCredentials, userId: string = 'user_default'): void {
+    platform = this.canonical(platform);
     // Pre-write validation
     if (!platform || (typeof platform === 'string' && platform.trim().length === 0)) {
       throw new Error(
@@ -75,7 +100,8 @@ export class CredentialRepository {
 
   /** Save a browser session's storageState (encrypted) for reuse. */
   saveBrowserSession(accountId: string, platform: string, storageState: string, fingerprintId?: string): void {
-    const maxAge = parseInt(process.env.SESSION_MAX_AGE_HOURS || '168', 10) * 60 * 60 * 1000;
+    platform = this.canonical(platform);
+    const maxAge = parseInt(process.env.SESSION_MAX_AGE_HOURS || String(DEFAULT_SESSION_MAX_AGE_HOURS), 10) * 60 * 60 * 1000;
     this.db.prepare(`
       INSERT OR REPLACE INTO browser_sessions (account_id, platform, storage_state, user_data_dir, saved_at, valid, max_age, fingerprint_id)
       VALUES (?, ?, ?, '', ?, 1, ?, ?)
@@ -84,6 +110,7 @@ export class CredentialRepository {
 
   /** Load a saved browser session for the given account + platform. */
   getBrowserSession(accountId: string, platform: string): { storageState: string; valid: boolean; savedAt: number; maxAge?: number } | null {
+    platform = this.canonical(platform);
     try {
       const row = this.db.prepare('SELECT * FROM browser_sessions WHERE account_id = ? AND platform = ?').get(accountId, platform) as Record<string, unknown> | undefined;
       if (!row) return null;
@@ -140,6 +167,7 @@ export class CredentialRepository {
    * If accountId is not provided, returns the 'default' account.
    */
   getCredential(platform: string, userId: string = 'user_default', accountId: string = 'default'): PlatformCredentials | undefined {
+    platform = this.canonical(platform);
     const row = this.db
       .prepare('SELECT * FROM platform_credentials WHERE user_id = ? AND platform = ? AND account_id = ?')
       .get(userId, platform, accountId) as Record<string, unknown> | undefined;
@@ -148,12 +176,14 @@ export class CredentialRepository {
   }
 
   updateCredentialStatus(platform: string, status: string, userId: string = 'user_default', accountId: string = 'default'): void {
+    platform = this.canonical(platform);
     this.db
       .prepare('UPDATE platform_credentials SET status = ?, updated_at = ? WHERE user_id = ? AND platform = ? AND account_id = ?')
       .run(status, new Date().toISOString(), userId, platform, accountId);
   }
 
   deleteCredential(platform: string, userId: string = 'user_default', accountId: string = 'default'): void {
+    platform = this.canonical(platform);
     this.db
       .prepare('DELETE FROM platform_credentials WHERE user_id = ? AND platform = ? AND account_id = ?')
       .run(userId, platform, accountId);
@@ -181,6 +211,7 @@ export class CredentialRepository {
 
   /** Get all credentials for a specific platform (all accounts). */
   getCredentialsByPlatform(platform: string, userId?: string): PlatformCredentials[] {
+    platform = this.canonical(platform);
     const rows = userId
       ? this.db.prepare('SELECT * FROM platform_credentials WHERE user_id = ? AND platform = ?').all(userId, platform) as Record<string, unknown>[]
       : this.db.prepare('SELECT * FROM platform_credentials WHERE platform = ?').all(platform) as Record<string, unknown>[];
@@ -192,7 +223,7 @@ export class CredentialRepository {
    * Returns credentials where last_checked_at is null or older than check_interval_ms,
    * limited to batchSize, ordered by last_checked_at ASC (oldest first).
    */
-  getCredentialsDueForCheck(batchSize: number = 3, userId?: string): PlatformCredentials[] {
+  getCredentialsDueForCheck(batchSize: number = DEFAULT_HEALTH_CHECK_BATCH_SIZE, userId?: string): PlatformCredentials[] {
     const rows = this.db
       .prepare(
         `SELECT * FROM platform_credentials
@@ -203,7 +234,7 @@ export class CredentialRepository {
          LIMIT ?`,
       )
       .all(
-        Date.now() - 6 * 60 * 60 * 1000,
+        Date.now() - DEFAULT_CREDENTIAL_CHECK_INTERVAL_MS,
         ...(userId ? [userId] : []),
         batchSize,
       ) as Record<string, unknown>[];
@@ -218,6 +249,7 @@ export class CredentialRepository {
     errorMessage?: string,
     userId: string = 'user_default',
   ): void {
+    platform = this.canonical(platform);
     const now = Date.now();
 
     // Insert log
@@ -330,6 +362,7 @@ export class CredentialRepository {
     checkError: string | null;
     lastValidatedAt: string | null;
   } | undefined {
+    platform = this.canonical(platform);
     const row = this.db
       .prepare(
         'SELECT platform, status, last_check_status, consecutive_failures, last_checked_at, check_error, last_validated_at FROM platform_credentials WHERE user_id = ? AND platform = ?',
@@ -349,6 +382,7 @@ export class CredentialRepository {
 
   /** Get the consecutive failure count for a credential. */
   getConsecutiveFailures(platform: string, userId: string = 'user_default'): number {
+    platform = this.canonical(platform);
     const row = this.db
       .prepare('SELECT consecutive_failures FROM platform_credentials WHERE user_id = ? AND platform = ?')
       .get(userId, platform) as { consecutive_failures: number } | undefined;
@@ -357,6 +391,7 @@ export class CredentialRepository {
 
   /** Explicitly mark a credential as expired with a reason. */
   markCredentialExpired(platform: string, reason: string, userId: string = 'user_default'): void {
+    platform = this.canonical(platform);
     const now = Date.now();
     this.db
       .prepare(
@@ -372,7 +407,7 @@ export class CredentialRepository {
   }
 
   /** Get recent health check logs, optionally filtered by platform. */
-  getHealthLogs(limit: number = 50, platform?: string, userId?: string): Array<{
+  getHealthLogs(limit: number = DEFAULT_HEALTH_LOGS_LIMIT, platform?: string, userId?: string): Array<{
     id: number;
     platform: string;
     userId: string;
@@ -381,6 +416,7 @@ export class CredentialRepository {
     errorMessage: string | null;
     checkedAt: number;
   }> {
+    if (platform) platform = this.canonical(platform);
     const safeLimit = Math.max(1, Math.floor(limit));
     let sql = 'SELECT * FROM session_health_logs';
     const conditions: string[] = [];
@@ -477,6 +513,7 @@ export class CredentialRepository {
     errorMessage?: string,
     cookieCount?: number,
   ): void {
+    platform = this.canonical(platform);
     this.db.prepare(
       `INSERT INTO relogin_logs (platform, user_id, success, error_type, error_message, cookie_count, attempted_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -488,7 +525,7 @@ export class CredentialRepository {
   }
 
   /** Get recent relogin attempts. */
-  getReloginLogs(limit: number = 50, platform?: string): Array<{
+  getReloginLogs(limit: number = DEFAULT_RELOGIN_LOGS_LIMIT, platform?: string): Array<{
     id: number;
     platform: string;
     userId: string;
@@ -498,6 +535,7 @@ export class CredentialRepository {
     cookieCount: number | null;
     attemptedAt: number;
   }> {
+    if (platform) platform = this.canonical(platform);
     const safeLimit = Math.max(1, Math.floor(limit));
     let sql = 'SELECT * FROM relogin_logs';
     const params: unknown[] = [];
@@ -563,6 +601,7 @@ export class CredentialRepository {
 
   /** Get all credentials for a platform across all accounts (for dynamic account allocation). */
   getAllCredentialsForPlatform(platform: string, userId?: string): PlatformCredentials[] {
+    platform = this.canonical(platform);
     const rows = userId
       ? this.db.prepare('SELECT * FROM platform_credentials WHERE platform = ? AND user_id = ?').all(platform, userId) as Record<string, unknown>[]
       : this.db.prepare('SELECT * FROM platform_credentials WHERE platform = ?').all(platform) as Record<string, unknown>[];
@@ -571,6 +610,7 @@ export class CredentialRepository {
 
   /** Get all active credentials for a platform (for dynamic account allocation). */
   getActiveCredentialsForPlatform(platform: string, userId?: string): PlatformCredentials[] {
+    platform = this.canonical(platform);
     const rows = userId
       ? this.db.prepare("SELECT * FROM platform_credentials WHERE platform = ? AND user_id = ? AND status = 'active'").all(platform, userId) as Record<string, unknown>[]
       : this.db.prepare("SELECT * FROM platform_credentials WHERE platform = ? AND status = 'active'").all(platform) as Record<string, unknown>[];
@@ -579,6 +619,7 @@ export class CredentialRepository {
 
   /** Get active credentials for a platform filtered by brand ID. */
   getActiveCredentialsForPlatformAndBrand(platform: string, brandId: number, userId?: string): PlatformCredentials[] {
+    platform = this.canonical(platform);
     const rows = userId
       ? this.db.prepare("SELECT * FROM platform_credentials WHERE platform = ? AND user_id = ? AND brand_id = ? AND status = 'active'").all(platform, userId, brandId) as Record<string, unknown>[]
       : this.db.prepare("SELECT * FROM platform_credentials WHERE platform = ? AND brand_id = ? AND status = 'active'").all(platform, brandId) as Record<string, unknown>[];
@@ -592,6 +633,7 @@ export class CredentialRepository {
     userId: string = 'user_default',
     accountId: string = 'default',
   ): void {
+    platform = this.canonical(platform);
     const encrypted = encryptJSON(data);
     this.db
       .prepare(
@@ -604,6 +646,7 @@ export class CredentialRepository {
 
   /** Invalidate a browser session (mark as invalid so next acquire creates fresh context). */
   invalidateBrowserSession(accountId: string, platform: string): void {
+    platform = this.canonical(platform);
     this.db
       .prepare('UPDATE browser_sessions SET valid = 0 WHERE account_id = ? AND platform = ?')
       .run(accountId, platform);

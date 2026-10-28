@@ -17,24 +17,20 @@ import Database from 'better-sqlite3';
 import { decrypt, encrypt } from '@zemingengine/account-vault';
 import type { AccountCredentials, BrowserFingerprint, PlatformName, ProxyConfig, SessionState } from '@zemingengine/account-vault';
 import { initSessionTables } from '@zemingengine/shared';
+import { getPlatformInfoBySessionName } from '@zemingengine/shared';
 
 const SESSION_DIR = 'apps/data/sessions';
 const MAX_CONCURRENT = 8;
 
-/** 各平台 cookie 域名白名单 — 只保留对应平台的 cookie，过滤跨域泄露 */
-const PLATFORM_COOKIE_DOMAINS: Record<string, string[]> = {
-  zhihu: ['.zhihu.com'],
-  csdn: ['.csdn.net'],
-  baijiahao: ['.baijiahao.baidu.com', '.baidu.com'],
-  baike: ['.baike.baidu.com', '.baidu.com'],
-  toutiao: ['.toutiao.com', '.douyin.com'],
-  netease: ['.163.com'],
-  sohu: ['.sohu.com'],
-  juejin: ['.juejin.cn'],
-  bilibili: ['.bilibili.com'],
-  zhidao: ['.zhidao.baidu.com', '.baidu.com'],
-  weixin: ['.qq.com'],
-};
+/**
+ * 获取平台 cookie 域名白名单（从共享 platform-registry 读取）。
+ * 将 registry 风格域名（如 "zhihu.com"）转换为点前缀格式（如 ".zhihu.com"）
+ * 以兼容 cookie 过滤逻辑。
+ */
+function getPlatformDomains(platform: string): string[] {
+  const info = getPlatformInfoBySessionName(platform);
+  return info?.domains?.map((d) => `.${d}`) ?? [];
+}
 
 interface PoolEntry {
   context: BrowserContext;
@@ -299,7 +295,7 @@ export class SessionPool {
    */
   private filterCookiesByDomain(storageState: any, platform: string): any {
     if (!storageState?.cookies) return storageState;
-    const allowedDomains = PLATFORM_COOKIE_DOMAINS[platform] || [];
+    const allowedDomains = getPlatformDomains(platform);
     if (allowedDomains.length === 0) return storageState;
 
     const filtered = storageState.cookies.filter((cookie: any) => {
@@ -399,7 +395,9 @@ export class SessionPool {
    */
   async close() {
     for (const [, entry] of this.pool) {
-      try { await entry.context.close(); } catch {}
+      try { await entry.context.close(); } catch (err) {
+        console.warn('[SessionPool] Failed to close browser context', { error: err instanceof Error ? err.message : String(err) });
+      }
     }
     this.pool.clear();
     if (this.browser) {

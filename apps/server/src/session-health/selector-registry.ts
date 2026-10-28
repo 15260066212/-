@@ -68,30 +68,6 @@ export const SELECTOR_REGISTRY: PlatformSelectorSet[] = [
     ],
   },
 
-  // === BAIJIA (百家号) ===
-  {
-    platform: 'baijia',
-    validateUrl: PLATFORM_URLS.baijia!,
-    loginUrl: 'https://baijiahao.baidu.com',
-    successUrlPattern: 'baijiahao.baidu.com',
-    selectors: [
-      { selector: 'input.editor-title', purpose: 'publish_title_input' },
-      { selector: 'input[placeholder*="标题"]', purpose: 'publish_title_input' },
-      { selector: '.editor-content', purpose: 'publish_content_editor' },
-      { selector: '.ProseMirror', purpose: 'publish_content_editor' },
-      { selector: '.ql-editor', purpose: 'publish_content_editor' },
-      { selector: '[contenteditable="true"]', purpose: 'publish_content_editor' },
-      { selector: 'textarea.editor-content', purpose: 'publish_content_editor' },
-      { selector: 'button:has-text("发布")', purpose: 'publish_button' },
-      { selector: '.publish-btn', purpose: 'publish_button' },
-      { selector: 'button:has-text("确认发布")', purpose: 'publish_confirm_button' },
-      { selector: '.btn-confirm', purpose: 'publish_confirm_button' },
-      { selector: '.builder-home', purpose: 'session_check_element' },
-      { selector: '.home-index', purpose: 'session_check_element' },
-      { selector: '.u-wrap-header', purpose: 'session_check_element' },
-    ],
-  },
-
   // === TOUTIAO (头条号) ===
   {
     platform: 'toutiao',
@@ -121,26 +97,43 @@ export const SELECTOR_REGISTRY: PlatformSelectorSet[] = [
     loginUrl: 'https://passport.csdn.net/login',
     successUrlPattern: 'csdn.net',
     selectors: [
+      // Title input
       { selector: '.article-bar__input', purpose: 'publish_title_input' },
       { selector: '#txtTitle', purpose: 'publish_title_input' },
       { selector: 'input[placeholder*="标题"]', purpose: 'publish_title_input' },
       { selector: 'input.article-title', purpose: 'publish_title_input' },
+      { selector: '.editor-header input[placeholder*="标题"]', purpose: 'publish_title_input' },
+      { selector: 'div[class*="title"] input', purpose: 'publish_title_input' },
+      { selector: 'textarea[placeholder*="标题"]', purpose: 'publish_title_input' },
+      // Content editor (CodeMirror 6 or textarea)
       { selector: 'textarea[name="content"]', purpose: 'publish_content_editor' },
       { selector: 'textarea.editor-textarea', purpose: 'publish_content_editor' },
       { selector: '.CodeMirror', purpose: 'publish_content_editor' },
       { selector: '.cm-editor', purpose: 'publish_content_editor' },
       { selector: '.editor-area', purpose: 'publish_content_editor' },
       { selector: '[contenteditable="true"]', purpose: 'publish_content_editor' },
+      { selector: '.md-editor', purpose: 'publish_content_editor' },
+      { selector: '.markdown-editor', purpose: 'publish_content_editor' },
+      // Publish button
       { selector: 'button:has-text("发布文章")', purpose: 'publish_button' },
       { selector: 'button:has-text("发布")', purpose: 'publish_button' },
       { selector: '.btn-publish', purpose: 'publish_button' },
       { selector: 'button.btn-publish', purpose: 'publish_button' },
       { selector: 'button.publish-btn', purpose: 'publish_button' },
+      { selector: '.editor-header button:has-text("发布")', purpose: 'publish_button' },
+      { selector: '.toolbar-right button:has-text("发布")', purpose: 'publish_button' },
+      { selector: '.el-button--primary:has-text("发布")', purpose: 'publish_button' },
+      // Tag input
       { selector: 'input[placeholder*="标签"]', purpose: 'publish_tag_input' },
       { selector: '.tag-input input', purpose: 'publish_tag_input' },
+      { selector: '.tags input', purpose: 'publish_tag_input' },
+      { selector: 'div[class*="tag"] input', purpose: 'publish_tag_input' },
+      // Session check (logged in indicator)
       { selector: '.toolbar-search', purpose: 'session_check_element' },
       { selector: '#csdn-toolbar', purpose: 'session_check_element' },
       { selector: '.blog-content', purpose: 'session_check_element' },
+      { selector: '.user-info', purpose: 'session_check_element' },
+      { selector: '.avatar', purpose: 'session_check_element' },
       // Login form selectors
       { selector: 'input[type="text"], input[name="username"]', purpose: 'login_username' },
       { selector: 'input[type="password"]', purpose: 'login_password' },
@@ -171,32 +164,6 @@ export const SELECTOR_REGISTRY: PlatformSelectorSet[] = [
       { selector: 'input[placeholder*="手机"], input[type="tel"]', purpose: 'login_username' },
       { selector: 'input[type="password"]', purpose: 'login_password' },
       { selector: 'button:has-text("登录")', purpose: 'login_submit' },
-    ],
-  },
-
-  // === BILIBILI (B站) ===
-  {
-    platform: 'bilibili',
-    validateUrl: PLATFORM_URLS.bilibili!,
-    loginUrl: 'https://passport.bilibili.com/login',
-    successUrlPattern: 'bilibili.com',
-    selectors: [
-      { selector: 'input.title', purpose: 'publish_title_input' },
-      { selector: 'input[placeholder*="标题"]', purpose: 'publish_title_input' },
-      { selector: '.ql-editor', purpose: 'publish_content_editor' },
-      { selector: '.ProseMirror', purpose: 'publish_content_editor' },
-      { selector: '[contenteditable="true"]', purpose: 'publish_content_editor' },
-      { selector: 'button:has-text("发布")', purpose: 'publish_button' },
-      { selector: '.submit-btn', purpose: 'publish_button' },
-      { selector: 'input[placeholder*="标签"]', purpose: 'publish_tag_input' },
-      { selector: '.home-container', purpose: 'session_check_element' },
-      { selector: '.user-avatar', purpose: 'session_check_element' },
-      { selector: '.h-body', purpose: 'session_check_element' },
-      // Login form selectors
-      { selector: 'input[type="text"], input[name="username"]', purpose: 'login_username' },
-      { selector: 'input[type="password"]', purpose: 'login_password' },
-      { selector: 'button:has-text("登录"), .btn-login', purpose: 'login_submit' },
-      { selector: '.geetest, .captcha, #captcha', purpose: 'login_captcha' },
     ],
   },
 
@@ -237,25 +204,6 @@ export const SELECTOR_REGISTRY: PlatformSelectorSet[] = [
       { selector: '.publish-btn', purpose: 'publish_button' },
       { selector: '.mp-163', purpose: 'session_check_element' },
       { selector: '.home-container', purpose: 'session_check_element' },
-    ],
-  },
-
-  // === ZHIDAO (百度知道) ===
-  {
-    platform: 'zhidao',
-    validateUrl: PLATFORM_URLS.zhidao!,
-    loginUrl: 'https://passport.baidu.com/v2/?login',
-    successUrlPattern: 'zhidao.baidu.com',
-    selectors: [
-      { selector: '#ask-title-input', purpose: 'publish_title_input' },
-      { selector: 'input.ask-title', purpose: 'publish_title_input' },
-      { selector: 'input[placeholder*="提问"]', purpose: 'publish_title_input' },
-      { selector: '#ask-content', purpose: 'publish_content_editor' },
-      { selector: 'textarea.ask-detail', purpose: 'publish_content_editor' },
-      { selector: 'button:has-text("提交")', purpose: 'publish_button' },
-      { selector: 'button:has-text("发布")', purpose: 'publish_button' },
-      { selector: '.user-bar', purpose: 'session_check_element' },
-      { selector: '.user-name', purpose: 'session_check_element' },
     ],
   },
 

@@ -1,100 +1,58 @@
-import type { Article, PlatformCredentials, PlatformId } from '@zemingengine/shared';
-import type { Page } from 'playwright';
+import type { Article, PlatformCredentials } from '@zemingengine/shared';
 import type { PublishResult } from '../types.js';
-import { LLMWikiHandler } from '../rpa-handlers/llmwiki-handler.js';
 
 /**
- * LLMWiki fallback publisher.
+ * LLMWiki Fallback Publisher
  *
- * When the primary RPA handler fails, this module attempts to publish
- * using the LLMWiki knowledge base as a fallback. This provides
- * automatic self-healing and platform-change resilience.
+ * Provides LLMWiki-based self-healing fallback when regular RPA publishing fails.
+ * This is a stub implementation — the full feature uses the LLMWiki platform
+ * as an alternative publishing channel when the primary platform has issues.
  */
 export class LLMWikiFallback {
-  private llmwikiHandler: LLMWikiHandler | null = null;
-  private fallbackEnabled: boolean;
+  private enabled: boolean;
 
-  constructor(enabled: boolean = true) {
-    this.fallbackEnabled = enabled;
+  constructor(enabled: boolean = false) {
+    this.enabled = enabled;
   }
 
   /**
-   * Enable or disable LLMWiki fallback at runtime.
+   * Enable or disable the LLMWiki fallback at runtime.
    */
   setEnabled(enabled: boolean): void {
-    this.fallbackEnabled = enabled;
-    console.log(`[LLMWikiFallback] LLMWiki fallback: ${enabled ? 'enabled' : 'disabled'}`);
+    this.enabled = enabled;
   }
 
   /**
-   * Check if LLMWiki fallback should be attempted for a given platform.
-   * Lazily initializes the LLMWikiHandler on first check.
+   * Check if LLMWiki fallback can be used for the given platform.
+   * Returns true only when fallback is enabled AND the platform is supported.
    */
-  canUseLLMWikiFallback(platform: PlatformId): boolean {
-    if (!this.fallbackEnabled) return false;
-    // Lazy init the handler on first check
-    if (!this.llmwikiHandler) {
-      const handler = this.findLLMWikiModule();
-      if (!handler) {
-        this.fallbackEnabled = false;
-        return false;
-      }
-      this.llmwikiHandler = handler;
-    }
-    return this.llmwikiHandler.supportsPlatform(platform);
+  canUseLLMWikiFallback(platform: string): boolean {
+    if (!this.enabled) return false;
+    // Only support platforms where LLMWiki has a compatible publishing path
+    const supportedPlatforms = ['csdn', 'jianshu', 'zhihu'];
+    return supportedPlatforms.includes(platform);
   }
 
   /**
-   * Find and initialize the LLMWiki module (LLMWikiHandler).
-   * Returns null if initialization fails.
+   * Attempt to publish via LLMWiki as a fallback channel.
+   * Returns a PublishResult on success, or throws on failure.
+   *
+   * Note: This is a stub. The real implementation would:
+   * 1. Acquire an LLMWiki browser session
+   * 2. Publish the article through the LLMWiki interface
+   * 3. Return the published URL and status
    */
-  private findLLMWikiModule(): LLMWikiHandler | null {
-    try {
-      return new LLMWikiHandler();
-    } catch (e) {
-      console.warn('[LLMWikiFallback] Failed to init LLMWikiHandler, fallback disabled:',
-        e instanceof Error ? e.message : String(e));
-      return null;
-    }
-  }
-
-  /**
-   * Try publishing via LLMWiki fallback.
-   * Called when the primary RPA handler fails.
-   */
-  async tryLLMWikiFallback(
-    page: Page,
-    platform: PlatformId,
+  async tryFallback(
     article: Article,
     credentials: PlatformCredentials,
-    originalError: string,
-  ): Promise<PublishResult | null> {
-    if (!this.canUseLLMWikiFallback(platform) || !this.llmwikiHandler) {
-      return null;
+    accountId: string,
+  ): Promise<PublishResult> {
+    if (!this.enabled) {
+      throw new Error('LLMWiki fallback is not enabled');
     }
 
-    console.log(`[LLMWikiFallback] Primary handler failed for ${platform}, trying LLMWiki fallback...`);
-    console.log(`[LLMWikiFallback] Original error: ${originalError.substring(0, 200)}`);
-
-    try {
-      const fallbackResult = await this.llmwikiHandler.publish(page, article, credentials);
-
-      if (fallbackResult.success) {
-        console.log(`[LLMWikiFallback] LLMWiki fallback succeeded for ${platform}!`);
-        return {
-          ...fallbackResult,
-          verificationMessage: fallbackResult.verificationMessage
-            ? `${fallbackResult.verificationMessage} (via LLMWiki fallback)`
-            : 'Published via LLMWiki fallback',
-        };
-      } else {
-        console.warn(`[LLMWikiFallback] LLMWiki fallback also failed for ${platform}: ${fallbackResult.error}`);
-        return null;
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[LLMWikiFallback] LLMWiki fallback error for ${platform}:`, msg);
-      return null;
-    }
+    // Stub: always fail so callers fall through to the original error.
+    // Replace with actual LLMWiki publishing logic when the feature is implemented.
+    throw new Error('LLMWiki fallback not implemented yet');
   }
 }

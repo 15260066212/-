@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { PlatformId, ArticleContentType, SessionData } from '@zemingengine/shared';
 import { usePipelineStore } from '../../stores/pipelineStore.js';
 import { Building2, Send, Sparkles } from 'lucide-react';
@@ -11,14 +11,11 @@ interface Props {
 const ALL_PLATFORMS: { id: PlatformId; label: string }[] = [
   { id: 'weixin', label: '微信公众号' },
   { id: 'zhihu', label: '知乎' },
-  { id: 'baijia', label: '百家号' },
   { id: 'toutiao', label: '今日头条' },
   { id: 'csdn', label: 'CSDN' },
   { id: 'juejin', label: '掘金' },
-  { id: 'bilibili', label: '哔哩哔哩' },
   { id: 'sohu', label: '搜狐号' },
   { id: 'netease', label: '网易号' },
-  { id: 'zhidao', label: '百度知道' },
 ];
 
 const CONTENT_TYPES: { id: ArticleContentType; label: string }[] = [
@@ -39,6 +36,19 @@ export function PipelineLauncher({ sessionId, sessionData }: Props) {
   const [autoPublish, setAutoPublish] = useState(false);
   const [scheduledPublish, setScheduledPublish] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
+  /** 每个平台定制的篇数，未设置的平台在后端会使用 planDuration 默认值 */
+  const [perPlatformCounts, setPerPlatformCounts] = useState<Partial<Record<PlatformId, number>>>({});
+
+  // 当选中平台变化时，自动为新选中的平台设默认篇数，移除未选中的
+  useEffect(() => {
+    setPerPlatformCounts((prev) => {
+      const next: Partial<Record<PlatformId, number>> = {};
+      selectedPlatforms.forEach((p) => {
+        next[p] = prev[p] ?? 1;
+      });
+      return next;
+    });
+  }, [selectedPlatforms]);
 
   const enterprise = sessionData?.enterprise;
   const enterpriseName = enterprise?.fullName || '未命名企业';
@@ -58,6 +68,17 @@ export function PipelineLauncher({ sessionId, sessionData }: Props) {
     });
   };
 
+  const updatePlatformCount = (id: PlatformId, n: number) => {
+    const clamped = Math.max(1, Math.min(n, 50));
+    setPerPlatformCounts((prev) => ({ ...prev, [id]: clamped }));
+  };
+
+  // 计算预览的总篇数
+  const previewTotal = Array.from(selectedPlatforms).reduce(
+    (sum, p) => sum + (perPlatformCounts[p] ?? 1),
+    0,
+  );
+
   const handleStart = () => {
     if (selectedPlatforms.size === 0 || isRunning) return;
     startPipeline({
@@ -66,6 +87,7 @@ export function PipelineLauncher({ sessionId, sessionData }: Props) {
       contentType,
       autoPublish,
       scheduledAt: scheduledPublish && scheduledAt ? scheduledAt : undefined,
+      platformArticleCounts: perPlatformCounts,
     });
   };
 
@@ -119,18 +141,19 @@ export function PipelineLauncher({ sessionId, sessionData }: Props) {
         </p>
       </div>
 
-      {/* 平台选择 */}
+      {/* 平台选择（带每平台篇数定制） */}
       <div className="mb-5">
         <label className="block text-sm font-medium text-foreground/70 mb-2">
-          选择平台
+          选择平台（可定制每个平台的篇数）
         </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+        <div className="space-y-2">
           {ALL_PLATFORMS.map((platform) => {
             const checked = selectedPlatforms.has(platform.id);
+            const count = perPlatformCounts[platform.id] ?? 1;
             return (
-              <label
+              <div
                 key={platform.id}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-colors text-sm ${
+                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
                   checked
                     ? 'border-primary bg-primary/10 text-primary/90'
                     : 'border-border hover:border-border/80 text-foreground/70'
@@ -140,13 +163,32 @@ export function PipelineLauncher({ sessionId, sessionData }: Props) {
                   type="checkbox"
                   checked={checked}
                   onChange={() => togglePlatform(platform.id)}
-                  className="rounded border-border text-primary focus:ring-primary"
+                  className="rounded border-border text-primary focus:ring-primary flex-shrink-0"
                 />
-                <span>{platform.label}</span>
-              </label>
+                <span className="flex-1 text-sm">{platform.label}</span>
+                {checked && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground">篇数</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={count}
+                      onChange={(e) => updatePlatformCount(platform.id, parseInt(e.target.value, 10) || 1)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-16 rounded border border-border bg-background px-2 py-0.5 text-sm text-center text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
+        {selectedPlatforms.size > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            预计共生成 <span className="font-medium text-primary">{previewTotal}</span> 篇文章
+          </p>
+        )}
       </div>
 
       {/* 内容类型选择 */}

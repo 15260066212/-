@@ -30,16 +30,12 @@ describe('ReloginManager', () => {
       expect(manager.isPlatformSupported('juejin')).toBe(true);
     });
 
-    it('支持 bilibili', () => {
-      expect(manager.isPlatformSupported('bilibili')).toBe(true);
+    it('不支持 bilibili', () => {
+      expect(manager.isPlatformSupported('bilibili')).toBe(false);
     });
 
     it('不支持 zhihu', () => {
       expect(manager.isPlatformSupported('zhihu')).toBe(false);
-    });
-
-    it('不支持 baijia', () => {
-      expect(manager.isPlatformSupported('baijia')).toBe(false);
     });
 
     it('不支持 toutiao', () => {
@@ -101,17 +97,16 @@ describe('ReloginManager', () => {
       expect(status).toHaveProperty('supportedPlatforms');
       expect(status.supportedPlatforms).toContain('csdn');
       expect(status.supportedPlatforms).toContain('juejin');
-      expect(status.supportedPlatforms).toContain('bilibili');
       expect(status).toHaveProperty('cooldowns');
       expect(status).toHaveProperty('attemptHistory');
       expect(status.cooldowns.length).toBe(0);
-      expect(status.attemptHistory.length).toBe(3); // 3 supported platforms
+      expect(status.attemptHistory.length).toBe(2); // 2 supported platforms
       expect(status.attemptHistory[0].recentAttempts).toBe(0);
     });
 
-    it('supportedPlatforms 刚好 3 个', () => {
+    it('supportedPlatforms 刚好 2 个', () => {
       const status = manager.getStatus();
-      expect(status.supportedPlatforms.length).toBe(3);
+      expect(status.supportedPlatforms.length).toBe(2);
     });
   });
 });

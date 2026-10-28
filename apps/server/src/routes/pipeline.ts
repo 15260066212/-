@@ -22,8 +22,8 @@ function formatError(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown error';
 }
 
-/** Tracks active pipeline runs for cancellation. */
-const activeRuns = new Map<string, { cancelled: boolean }>();
+/** Tracks active pipeline runs for cancellation & pause/resume. */
+const activeRuns = new Map<string, { cancelled: boolean; paused: boolean }>();
 
 /** Stores real-time user feedback per sessionId, consumed by the pipeline generator. */
 const pipelineFeedback = new Map<string, string>();
@@ -64,7 +64,8 @@ export function createPipelineRoutes(db: DatabaseAccess): Hono {
       }
 
       const articlesPerPlatform = getArticlesPerPlatform(body.planDuration);
-      const planned = body.planArticles?.length || (body.platforms.length * articlesPerPlatform);
+      const planned = body.planArticles?.length
+        || computeTotalFromPlatformCounts(body, articlesPerPlatform);
       const cap = resolveMaxArticlesCap(body);
       const totalArticles = cap !== undefined ? Math.min(planned, cap) : planned;
 
@@ -80,8 +81,8 @@ export function createPipelineRoutes(db: DatabaseAccess): Hono {
       };
       db.pipeline.insertPipelineRun(run);
 
-      // Track for cancellation
-      const runState = { cancelled: false };
+      // Track for cancellation & pause
+      const runState = { cancelled: false, paused: false };
       activeRuns.set(runId, runState);
 
       // Start background processing (non-blocking)
@@ -106,6 +107,46 @@ export function createPipelineRoutes(db: DatabaseAccess): Hono {
     db.pipeline.updatePipelineRun(runId, { status: 'cancelled', completedAt: new Date().toISOString() });
 
     return c.json({ success: true, data: { runId, status: 'cancelled' } });
+  });
+
+  // POST /pause/:runId - 暂停正在运行的流水线
+  app.post('/pause/:runId', (c) => {
+    const runId = c.req.param('runId');
+    const runState = activeRuns.get(runId);
+
+    if (!runState) {
+      return c.json({ success: false, error: 'Pipeline run not found or already completed' }, 404);
+    }
+
+    if (runState.cancelled) {
+      return c.json({ success: false, error: 'Pipeline run has been cancelled' }, 400);
+    }
+
+    runState.paused = true;
+    db.pipeline.updatePipelineRun(runId, { status: 'paused' });
+
+    console.log(`[Pipeline] Run ${runId} paused by user`);
+    return c.json({ success: true, data: { runId, status: 'paused' } });
+  });
+
+  // POST /resume/:runId - 恢复暂停的流水线
+  app.post('/resume/:runId', (c) => {
+    const runId = c.req.param('runId');
+    const runState = activeRuns.get(runId);
+
+    if (!runState) {
+      return c.json({ success: false, error: 'Pipeline run not found or expired. Paused runs cannot be resumed after server restart.' }, 404);
+    }
+
+    if (runState.cancelled) {
+      return c.json({ success: false, error: 'Pipeline run has been cancelled' }, 400);
+    }
+
+    runState.paused = false;
+    db.pipeline.updatePipelineRun(runId, { status: 'running' });
+
+    console.log(`[Pipeline] Run ${runId} resumed by user`);
+    return c.json({ success: true, data: { runId, status: 'running' } });
   });
 
   // POST /feedback/:sessionId - 提交实时文章反馈（流水线运行中也可使用）
@@ -225,7 +266,22 @@ export function createPipelineRoutes(db: DatabaseAccess): Hono {
   return app;
 }
 
-/** Build the article execution list from planArticles or platforms × contentTypes. */
+/** Compute total articles from per-platform overrides, falling back to uniform articlesPerPlatform. */
+function computeTotalFromPlatformCounts(
+  request: PipelineRequest,
+  defaultPerPlatform: number,
+): number {
+  const overrides = request.platformArticleCounts;
+  if (overrides && Object.keys(overrides).length > 0) {
+    return request.platforms.reduce((sum, p) => {
+      const n = overrides[p];
+      return sum + (typeof n === 'number' && n > 0 ? n : defaultPerPlatform);
+    }, 0);
+  }
+  return request.platforms.length * defaultPerPlatform;
+}
+
+/** Build the article execution list from planArticles, per-platform overrides, or platforms × contentTypes. */
 function buildArticleList(
   request: PipelineRequest,
   articlesPerPlatform: number,
@@ -239,8 +295,12 @@ function buildArticleList(
     }
   } else {
     const contentTypes = request.contentTypes?.length ? request.contentTypes : [request.contentType];
+    const overrides = request.platformArticleCounts;
     for (const platform of request.platforms) {
-      for (let i = 0; i < articlesPerPlatform; i++) {
+      const count = overrides && typeof overrides[platform] === 'number' && overrides[platform]! > 0
+        ? overrides[platform]!
+        : articlesPerPlatform;
+      for (let i = 0; i < count; i++) {
         list.push({ platform, contentType: contentTypes[i % contentTypes.length], contentSupplement: supplement });
       }
     }
@@ -310,6 +370,16 @@ async function generateArticleWithRetry(
   return undefined;
 }
 
+/** Simple polling wait while run is paused. Resumes immediately when unpaused, checks cancelled every tick. */
+async function waitWhilePaused(runState: { cancelled: boolean; paused: boolean }): Promise<'cancelled' | 'resumed'> {
+  const SLEEP_MS = 1500;
+  while (runState.paused) {
+    if (runState.cancelled) return 'cancelled';
+    await new Promise((r) => setTimeout(r, SLEEP_MS));
+  }
+  return runState.cancelled ? 'cancelled' : 'resumed';
+}
+
 /**
  * Execute the full pipeline in the background.
  * Generates articlesPerPlatform articles per platform, cycling through content types.
@@ -321,7 +391,7 @@ async function executePipeline(
   publisher: Publisher,
   request: PipelineRequest,
   runId: string,
-  runState: { cancelled: boolean },
+  runState: { cancelled: boolean; paused: boolean },
 ): Promise<void> {
   const session = db.sessions.getSession(request.sessionId);
   if (!session) {
@@ -340,6 +410,18 @@ async function executePipeline(
         db.pipeline.updatePipelineRun(runId, { completedArticles: completed });
         activeRuns.delete(runId);
         return;
+      }
+
+      // Cooperative pause check between articles (not mid-generation)
+      if (runState.paused) {
+        console.log(`[Pipeline] Run ${runId} paused before article ${idx + 1}/${articleList.length}, waiting...`);
+        const result = await waitWhilePaused(runState);
+        if (result === 'cancelled') {
+          db.pipeline.updatePipelineRun(runId, { status: 'cancelled', completedArticles: completed, completedAt: new Date().toISOString() });
+          activeRuns.delete(runId);
+          return;
+        }
+        console.log(`[Pipeline] Run ${runId} resumed, continuing from article ${idx + 1}`);
       }
 
       const item = articleList[idx];
@@ -420,7 +502,7 @@ async function publishForPipeline(
   });
 
   db.publish.insertPublishTask(task);
-  db.articles.updateArticle(article.id, { status: 'publishing' });
+  db.articles.updateArticle(article.id, { status: 'draft_saved' });
 
   await executePublishWithHandling(
     db, publisher, task, article, credentials,

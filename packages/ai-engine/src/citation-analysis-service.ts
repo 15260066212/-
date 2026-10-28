@@ -1,3 +1,5 @@
+import { classifyEcosystem, TRACKING_QUERY_KEYS } from './source-utils.js';
+
 interface Brand {
   name?: string;
   website?: string;
@@ -15,6 +17,31 @@ interface Source {
   title?: string;
   owned?: boolean;
   competitor_owned?: boolean;
+  ecosystem?: string;
+  ecosystem_label?: string;
+  publish_time?: string;
+}
+
+/** Intermediate source object produced by collectMetadataSources. */
+interface RawSource {
+  url?: string;
+  domain?: string;
+  source_origin?: string;
+  title?: string;
+}
+
+/** Normalized source after URL parsing and domain validation. */
+interface NormalizedSource {
+  url: string;
+  domain: string;
+  source_origin?: string;
+  title?: string;
+}
+
+/** Context metadata passed between source collection methods. */
+interface SourceContext {
+  source_origin?: string;
+  title?: string;
 }
 
 interface CitationResult {
@@ -22,14 +49,19 @@ interface CitationResult {
   citation_count: number;
   owned_citation_count: number;
   competitor_citation_count: number;
+  ecosystem_distribution: Record<string, number>;
 }
 
 export class CitationAnalysisService {
   NON_DOMAIN_TLDS = new Set(['js']);
-  TRACKING_QUERY_KEYS = new Set([
-    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id',
-    'spm', 'from', 'source', 'share', 'share_token', 'share_source', 'gclid', 'fbclid', 'msclkid', 'bd_vid'
-  ]);
+
+  /**
+   * Classify a domain into its ecosystem bucket.
+   * Delegates to the shared classifier in source-utils.ts (single source of truth).
+   */
+  classifyEcosystem(domain: string): { ecosystem: string; label: string } {
+    return classifyEcosystem(domain);
+  }
 
   normalizeDomain(value: string): string {
     const text = String(value || '').trim();
@@ -107,7 +139,7 @@ export class CitationAnalysisService {
     const host = `${hostname}${port}`;
     const pathname = parsed.pathname === '/' ? '' : parsed.pathname.replace(/\/$/, '');
     const params = Array.from(parsed.searchParams.entries())
-      .filter(([key]) => !this.TRACKING_QUERY_KEYS.has(String(key || '').toLowerCase()))
+      .filter(([key]) => !TRACKING_QUERY_KEYS.has(String(key || '').toLowerCase()))
       .sort(([aKey, aValue], [bKey, bValue]) => (
         String(aKey).localeCompare(String(bKey)) || String(aValue).localeCompare(String(bValue))
       ));
@@ -117,17 +149,17 @@ export class CitationAnalysisService {
     return `${protocol}//${host}${pathname}${query}`;
   }
 
-  metadataForSource(value: any, context: any = {}): Record<string, string> {
+  metadataForSource(value: Record<string, unknown> | null, context: SourceContext = {}): Record<string, string> {
     const metadata: Record<string, string> = {};
     if (context.source_origin) metadata.source_origin = context.source_origin;
     if (context.title) metadata.title = context.title;
-    if (context.source_origin === 'web_search' && typeof value?.title === 'string' && value.title.trim()) {
-      metadata.title = value.title.trim();
+    if (context.source_origin === 'web_search' && typeof value?.title === 'string' && (value.title as string).trim()) {
+      metadata.title = (value.title as string).trim();
     }
     return metadata;
   }
 
-  collectMetadataSources(value: any, sources: any[] = [], context: any = {}): any[] {
+  collectMetadataSources(value: unknown, sources: RawSource[] = [], context: SourceContext = {}): RawSource[] {
     if (!value) return sources;
     if (typeof value === 'string') {
       const url = this.normalizeCandidateUrl(value);
@@ -141,33 +173,34 @@ export class CitationAnalysisService {
       return sources;
     }
     if (typeof value === 'object') {
-      if (value.type === 'url_citation' && value.url_citation) {
-        this.collectMetadataSources(value.url_citation, sources, { ...context, source_origin: 'web_search' });
+      const obj = value as Record<string, unknown>;
+      if (obj.type === 'url_citation' && obj.url_citation) {
+        this.collectMetadataSources(obj.url_citation, sources, { ...context, source_origin: 'web_search' });
       }
       let hasUrlField = false;
       ['url', 'link', 'source', 'source_url', 'sourceUrl', 'reference_url', 'referenceUrl', 'display_url', 'displayUrl', 'web_url', 'webUrl', 'href'].forEach((key) => {
-        if (typeof value[key] === 'string') {
-          hasUrlField = hasUrlField || !!this.normalizeCandidateUrl(value[key]);
-          this.collectMetadataSources(value[key], sources, this.metadataForSource(value, context));
+        if (typeof obj[key] === 'string') {
+          hasUrlField = hasUrlField || !!this.normalizeCandidateUrl(obj[key] as string);
+          this.collectMetadataSources(obj[key], sources, this.metadataForSource(obj, context));
         }
       });
       if (!hasUrlField) {
         ['domain', 'source_domain', 'sourceDomain', 'display_domain', 'displayDomain', 'hostname', 'host'].forEach((key) => {
-          if (typeof value[key] === 'string' && !/^https?:\/\//i.test(value[key])) {
-            const domain = this.normalizeDomain(value[key]);
-            if (this.isValidDomain(domain)) sources.push({ url: '', domain, ...this.metadataForSource(value, context) });
+          if (typeof obj[key] === 'string' && !/^https?:\/\//i.test(obj[key] as string)) {
+            const domain = this.normalizeDomain(obj[key] as string);
+            if (this.isValidDomain(domain)) sources.push({ url: '', domain, ...this.metadataForSource(obj, context) });
           }
         });
       }
       ['citations', 'references', 'sources', 'source_urls', 'sourceUrls', 'search_results', 'searchResults', 'web_search', 'webSearch', 'source', 'output', 'content', 'choices', 'message', 'annotations', 'url_citation', 'urlCitation'].forEach((key) => {
-        if (value[key]) this.collectMetadataSources(value[key], sources, context);
+        if (obj[key]) this.collectMetadataSources(obj[key], sources, context);
       });
     }
     return sources;
   }
 
-  extractSources({ responseText, aiResponse, brand, competitors }: { responseText: string; aiResponse?: any; brand: Brand; competitors: Competitor[] }): CitationResult {
-    const rawSources = [
+  extractSources({ responseText, aiResponse, brand, competitors }: { responseText: string; aiResponse?: unknown; brand: Brand; competitors: Competitor[] }): CitationResult {
+    const rawSources: RawSource[] = [
       ...this.extractUrlsFromText(responseText).map((item) => ({ url: item.url })),
       ...this.collectMetadataSources(aiResponse)
     ];
@@ -176,8 +209,8 @@ export class CitationAnalysisService {
       .map((item) => this.normalizeDomain(item?.website || ''))
       .filter(Boolean);
     const seen = new Set<string>();
-    const normalizedSources = rawSources
-      .map((source: any) => {
+    const normalizedSources: (NormalizedSource | null)[] = rawSources
+      .map((source: RawSource): NormalizedSource | null => {
         const url = String(source?.url || '').trim();
         if (!url && source?.domain) {
           const domain = this.canonicalDomain(this.normalizeDomain(source.domain));
@@ -193,34 +226,47 @@ export class CitationAnalysisService {
         } catch {
           return null;
         }
-      })
-      .filter((source: any) => source?.domain)
-      .filter((source: any) => this.isValidDomain(source.domain))
-      .filter((source: any) => {
+      });
+    const validSources: NormalizedSource[] = normalizedSources
+      .filter((source): source is NormalizedSource => source !== null && !!source.domain)
+      .filter((source) => this.isValidDomain(source.domain))
+      .filter((source) => {
         const key = source.url ? source.url.toLowerCase() : `domain:${source.domain.toLowerCase()}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       });
     const urlDomains = new Set(
-      normalizedSources
-        .filter((source: any) => source.url)
-        .map((source: any) => this.canonicalDomain(source.domain))
+      validSources
+        .filter((source) => source.url)
+        .map((source) => this.canonicalDomain(source.domain))
         .filter(Boolean)
     );
-    const sources = normalizedSources
-      .filter((source: any) => source.url || !urlDomains.has(this.canonicalDomain(source.domain)))
-      .map((source: any) => ({
-        ...source,
-        owned: this.sameOrSubdomain(source.domain, brandDomain),
-        competitor_owned: competitorDomains.some((domain) => this.sameOrSubdomain(source.domain, domain))
-      }));
+    const sources: Source[] = validSources
+      .filter((source) => source.url || !urlDomains.has(this.canonicalDomain(source.domain)))
+      .map((source): Source => {
+        const eco = classifyEcosystem(source.domain);
+        return {
+          ...source,
+          ecosystem: eco.ecosystem,
+          ecosystem_label: eco.label,
+          owned: this.sameOrSubdomain(source.domain, brandDomain),
+          competitor_owned: competitorDomains.some((domain) => this.sameOrSubdomain(source.domain, domain))
+        };
+      });
+
+    const ecosystemDistribution = sources.reduce((acc: Record<string, number>, s: Source) => {
+      const key = s.ecosystem || 'independent';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
 
     return {
       sources,
       citation_count: sources.length,
-      owned_citation_count: sources.filter((item: any) => item.owned).length,
-      competitor_citation_count: sources.filter((item: any) => item.competitor_owned).length
+      owned_citation_count: sources.filter((item) => item.owned).length,
+      competitor_citation_count: sources.filter((item) => item.competitor_owned).length,
+      ecosystem_distribution: ecosystemDistribution,
     };
   }
 }

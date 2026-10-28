@@ -17,6 +17,7 @@ const DIMENSION_LABELS: Record<ReviewDimension, string> = {
   platform_adaptation: '平台适配',
   readability: '可读性',
   safety: '安全性',
+  truthfulness: '真实性',
 };
 
 const DIMENSION_ORDER: ReviewDimension[] = [
@@ -28,6 +29,7 @@ const DIMENSION_ORDER: ReviewDimension[] = [
   'platform_adaptation',
   'readability',
   'safety',
+  'truthfulness',
 ];
 
 const SEVERITY_CONFIG: Record<IssueSeverity, { label: string; className: string }> = {

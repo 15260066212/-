@@ -47,6 +47,8 @@ async function executePlanTask(db: DatabaseAccess, task: any): Promise<void> {
 
   const { ContentGenerator } = await import('@zemingengine/content-generator');
   const { ContentReviewer } = await import('@zemingengine/content-reviewer');
+  const { selectCitedSources, recordSourceUsage } = await import('@zemingengine/dialogue-engine');
+  const { updateSession } = await import('./session-store.js');
 
   const session = db.sessions.getSession(task.session_id);
   if (!session) {
@@ -54,7 +56,15 @@ async function executePlanTask(db: DatabaseAccess, task: any): Promise<void> {
     return;
   }
 
-  const generator = new ContentGenerator({ fallbackMode: true });
+  // 芯图EK · 三层取源（与 /api/articles/generate 一致），并记录引用集合用于组合统计
+  const selection = selectCitedSources(session, {
+    topic: task.topic,
+    platform: task.platform,
+    contentType: task.content_type,
+  });
+  const citedSources = selection?.selected ?? [];
+
+  const generator = new ContentGenerator();
   const reviewer = new ContentReviewer();
 
   const result = await generator.generate({
@@ -65,8 +75,10 @@ async function executePlanTask(db: DatabaseAccess, task: any): Promise<void> {
     keywords: task.keyword ? [task.keyword] : undefined,
     contentSupplement: task.content_supplement || undefined,
     generationRound: 1,
+    citedSources,
   }, session);
 
+  result.article.citedSourceIds = citedSources.map((source) => source.id);
   db.articles.insertArticle(result.article);
 
   const review = reviewer.review(result.article, session);
@@ -74,6 +86,10 @@ async function executePlanTask(db: DatabaseAccess, task: any): Promise<void> {
 
   if (review.passed) {
     db.articles.updateArticle(result.article.id, { status: 'approved' });
+    // 审核通过后回写信源引用计数（与 /generate 一致）
+    if (citedSources.length > 0) {
+      updateSession(task.session_id, recordSourceUsage(session, citedSources.map((s) => s.id)), db);
+    }
   } else {
     db.articles.updateArticle(result.article.id, { status: 'reviewing' });
   }

@@ -3,6 +3,7 @@ import {
   Search, Download, RefreshCw, Building2,
   FileText, Eye, BarChart3, AlertCircle,
 } from 'lucide-react';
+import { competitorMonitorPaths } from '../utils/api-paths.js';
 
 const COMPETITOR_MAX_CHARS = 1000;
 
@@ -39,7 +40,7 @@ export function CompetitorMonitorPage({ sessionData }: Props) {
     setError(null);
     try {
       const apiKey = localStorage.getItem('apiKey') || '';
-      const resp = await fetch('/api/competitor-monitor/generate', {
+      const resp = await fetch(competitorMonitorPaths.generate, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

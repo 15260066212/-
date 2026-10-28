@@ -1,4 +1,4 @@
-import { PLATFORM_NAMES } from '@zemingengine/shared';
+import { getPlatformLabel } from '@zemingengine/shared';
 import type { DatabaseAccess } from '../db.js';
 
 export interface AlertInfo {
@@ -20,7 +20,7 @@ export class HealthAlerter {
    * The alert will be sent by the `sendPendingAlerts()` method.
    */
   createAlert(info: AlertInfo): number {
-    const platformName = PLATFORM_NAMES[info.platform] || info.platform;
+    const platformName = getPlatformLabel(info.platform);
     const formattedMessage = `[${platformName}] ${info.message}`;
     return this.db.credentials.insertHealthAlert(
       info.platform,

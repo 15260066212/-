@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@zemingengine/shared": "*",
-    "@zemingengine/ai-engine": "*"
+    "@zemingengine/shared": "file:../shared",
+    "@zemingengine/ai-engine": "file:../ai-engine"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

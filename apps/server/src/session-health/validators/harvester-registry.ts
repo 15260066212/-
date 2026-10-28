@@ -17,13 +17,10 @@ export interface HarvesterPlatformConfig {
 export const HARVESTER_PLATFORMS: HarvesterPlatformConfig[] = [
   { platform: 'zhihu' },
   { platform: 'csdn' },
-  { platform: 'baijia', harvesterPlatform: 'baijiahao' },
   { platform: 'toutiao', harvesterPlatform: 'toutiaohao' },
   { platform: 'juejin' },
-  { platform: 'bilibili' },
   { platform: 'sohu', harvesterPlatform: 'sohuhao' },
   { platform: 'netease', harvesterPlatform: 'wangyihao' },
-  { platform: 'zhidao' },
 ];
 
 /**

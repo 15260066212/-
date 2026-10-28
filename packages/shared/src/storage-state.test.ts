@@ -5,38 +5,38 @@ import {
   resolveStorageState,
   mergeRefreshedCookies,
   hasFullStorageState,
-} from './storage-state.js';
+} from './utils/storage-state.js';
 
 describe('cookieStringToStorageState', () => {
   it('解析单个 cookie', () => {
     const state = cookieStringToStorageState('session=abc123');
-    expect(state.cookies.length).toBe(1);
-    expect(state.cookies[0].name).toBe('session');
-    expect(state.cookies[0].value).toBe('abc123');
-    expect(state.cookies[0].path).toBe('/');
-    expect(state.origins.length).toBe(0);
+    expect(state.cookies.length).toBe(1, 'should have correct length when 解析单个 cookie');
+    expect(state.cookies[0].name).toBe('session', 'should have correct name when 解析单个 cookie');
+    expect(state.cookies[0].value).toBe('abc123', 'should have correct value when 解析单个 cookie');
+    expect(state.cookies[0].path).toBe('/', 'should have correct path when 解析单个 cookie');
+    expect(state.origins.length).toBe(0, 'should have correct length when 解析单个 cookie');
   });
 
   it('解析多个 cookie', () => {
     const state = cookieStringToStorageState('a=1; b=2; c=3');
-    expect(state.cookies.length).toBe(3);
-    expect(state.cookies[0].name).toBe('a');
-    expect(state.cookies[1].name).toBe('b');
-    expect(state.cookies[2].name).toBe('c');
+    expect(state.cookies.length).toBe(3, 'should have correct length when 解析多个 cookie');
+    expect(state.cookies[0].name).toBe('a', 'should have correct name when 解析多个 cookie');
+    expect(state.cookies[1].name).toBe('b', 'should have correct name when 解析多个 cookie');
+    expect(state.cookies[2].name).toBe('c', 'should have correct name when 解析多个 cookie');
   });
 
   it('跳过空值和空 cookie', () => {
     const state = cookieStringToStorageState('a=1; ; b=2; =3');
-    expect(state.cookies.length).toBe(2);
-    expect(state.cookies[0].name).toBe('a');
-    expect(state.cookies[1].name).toBe('b');
+    expect(state.cookies.length).toBe(2, 'should have correct length when 跳过空值和空 cookie');
+    expect(state.cookies[0].name).toBe('a', 'should have correct name when 跳过空值和空 cookie');
+    expect(state.cookies[1].name).toBe('b', 'should have correct name when 跳过空值和空 cookie');
   });
 
   it('处理带等号的值', () => {
     const state = cookieStringToStorageState('token=abc=def=ghi');
-    expect(state.cookies.length).toBe(1);
-    expect(state.cookies[0].name).toBe('token');
-    expect(state.cookies[0].value).toBe('abc=def=ghi');
+    expect(state.cookies.length).toBe(1, 'should have correct length when 处理带等号的值');
+    expect(state.cookies[0].name).toBe('token', 'should have correct name when 处理带等号的值');
+    expect(state.cookies[0].value).toBe('abc=def=ghi', 'should have correct value when 处理带等号的值');
   });
 
   it('空字符串返回空 cookies', () => {

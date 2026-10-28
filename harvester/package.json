@@ -12,6 +12,7 @@
     "express": "^4.22.3",
     "fingerprint-injector": "^2.1.88",
     "playwright": "^1.40.0",
+    "sqlite3": "^6.0.1",
     "ws": "^8.22.0"
   },
   "devDependencies": {

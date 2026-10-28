@@ -9,6 +9,7 @@ interface PipelineStore {
   // State
   status: PipelineStatus | null;
   isRunning: boolean;
+  isPaused: boolean;
   loading: boolean;
   error: string | null;
   currentRunId: string | null;
@@ -17,18 +18,21 @@ interface PipelineStore {
   startPipeline: (req: PipelineRequest) => Promise<void>;
   fetchStatus: (sessionId: string) => Promise<void>;
   cancelPipeline: (runId: string) => Promise<void>;
+  pausePipeline: (runId: string) => Promise<void>;
+  resumePipeline: (runId: string) => Promise<void>;
   clearError: () => void;
 }
 
 export const usePipelineStore = create<PipelineStore>((set, get) => ({
   status: null,
   isRunning: false,
+  isPaused: false,
   loading: false,
   error: null,
   currentRunId: null,
 
   startPipeline: async (req: PipelineRequest) => {
-    set({ isRunning: true, loading: true, error: null });
+    set({ isRunning: true, isPaused: false, loading: true, error: null });
     try {
       // Async API: returns immediately with runId
       const data = await request<{ runId: string; status: string }>('/pipeline/start', {
@@ -38,9 +42,9 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       set({ currentRunId: data.runId, loading: false });
       // Immediately fetch status to show initial progress
       await get().fetchStatus(req.sessionId);
-    } catch (err) {
+    } catch (error) {
       set({
-        error: err instanceof Error ? err.message : '启动流水线失败',
+        error: error instanceof Error ? error.message : '启动流水线失败',
         isRunning: false,
         loading: false,
       });
@@ -52,10 +56,13 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       const status = await request<PipelineStatus>(
         `/pipeline/status/${encodeURIComponent(sessionId)}`,
       );
-      // Update isRunning based on pipeline run status
+      // Update isRunning & isPaused based on pipeline run status
       const run = status.run;
-      const isRunning = run?.status === 'running';
-      set({ status, isRunning });
+      set({
+        status,
+        isRunning: run?.status === 'running' || run?.status === 'paused',
+        isPaused: run?.status === 'paused',
+      });
     });
   },
 
@@ -65,10 +72,38 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
         `/pipeline/cancel/${encodeURIComponent(runId)}`,
         { method: 'POST' },
       );
-      set({ isRunning: false, currentRunId: null });
-    } catch (err) {
+      set({ isRunning: false, isPaused: false, currentRunId: null });
+    } catch (error) {
       set({
-        error: err instanceof Error ? err.message : '取消流水线失败',
+        error: error instanceof Error ? error.message : '取消流水线失败',
+      });
+    }
+  },
+
+  pausePipeline: async (runId: string) => {
+    try {
+      await request<{ runId: string; status: string }>(
+        `/pipeline/pause/${encodeURIComponent(runId)}`,
+        { method: 'POST' },
+      );
+      set({ isPaused: true });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : '暂停流水线失败',
+      });
+    }
+  },
+
+  resumePipeline: async (runId: string) => {
+    try {
+      await request<{ runId: string; status: string }>(
+        `/pipeline/resume/${encodeURIComponent(runId)}`,
+        { method: 'POST' },
+      );
+      set({ isPaused: false });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : '恢复流水线失败',
       });
     }
   },

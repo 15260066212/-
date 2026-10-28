@@ -40,8 +40,8 @@ export function startPlanTaskScheduler(
   };
 
   // Run first check after 30 seconds
-  setTimeout(() => { tick().catch(() => {}); }, 30000);
-  planSchedulerTimer = setInterval(() => { tick().catch(() => {}); }, PLAN_CHECK_INTERVAL_MS);
+  setTimeout(() => { tick().catch((err) => console.error('[PlanScheduler] Unexpected error in tick:', err instanceof Error ? err.message : String(err))); }, 30000);
+  planSchedulerTimer = setInterval(() => { tick().catch((err) => console.error('[PlanScheduler] Unexpected error in tick:', err instanceof Error ? err.message : String(err))); }, PLAN_CHECK_INTERVAL_MS);
 }
 
 export function stopPlanScheduler(): void {

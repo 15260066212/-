@@ -1,15 +1,4 @@
-import type { PlatformId } from '@zemingengine/shared';
-
-const HTML_PLATFORMS: PlatformId[] = [
-  'weixin',
-  'baijia',
-  'toutiao',
-  'bilibili',
-  'sohu',
-  'netease',
-];
-
-const PLAIN_PLATFORMS: PlatformId[] = [];
+import { getPlatformCapabilities, type PlatformId } from '@zemingengine/shared';
 
 export function adaptForPlatform(
   platform: PlatformId,
@@ -27,9 +16,12 @@ export function adaptForPlatform(
     contentMarkdown: markdownContent,
   };
 
-  if (HTML_PLATFORMS.includes(platform)) {
+  const capabilities = getPlatformCapabilities(platform);
+  const contentFormat = capabilities?.contentFormat ?? 'markdown';
+
+  if (contentFormat === 'html') {
     result.contentHtml = markdownToHtml(markdownContent);
-  } else if (PLAIN_PLATFORMS.includes(platform)) {
+  } else if (contentFormat === 'plaintext') {
     result.contentPlain = markdownToPlain(markdownContent);
   }
 

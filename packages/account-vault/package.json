@@ -2,6 +2,7 @@
   "name": "@zemingengine/account-vault",
   "version": "1.0.0",
   "description": "Encrypted credential storage and session persistence for multi-account multi-platform publishing",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {

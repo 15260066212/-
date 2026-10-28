@@ -11,6 +11,8 @@
   PublishFailureAnalysis,
   PlatformCredentials,
   PlatformId,
+  KnowledgeSource,
+  AICard,
   ProfileReviewRequest,
   ProfileReviewResponse,
   PublishTask,
@@ -32,6 +34,152 @@ export interface AiInfo {
   available: boolean;
   provider: string;
   model: string;
+}
+
+// === Profile types ===
+
+export interface ProfileCredentialInfo {
+  status: string;
+  cookieCount: number;
+  accountName: string;
+  lastValidatedAt: string | null;
+  brandId: number | null;
+}
+
+export interface ProfileInfo {
+  platform: string;
+  account: string;
+  accountName: string;
+  sizeBytes: number;
+  sizeMB: number;
+  profileDir?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  lastCheckedAt?: string | null;
+  isLoggedIn?: boolean | null;
+  credential?: ProfileCredentialInfo | null;
+}
+
+export interface ProfileHealthInfo {
+  success: boolean;
+  platform: string;
+  account: string;
+  loggedIn: boolean;
+  url?: string;
+  authCookies?: boolean;
+  sizeBytes?: number;
+  sizeMB?: number;
+  error?: string;
+}
+
+export interface ProfileRenewResult {
+  success: boolean;
+  platform: string;
+  account: string;
+  loggedIn: boolean;
+  error?: string;
+}
+
+// === Node Management types ===
+
+export type NodeStatus = 'online' | 'offline' | 'deploying';
+
+export interface NodeInfo {
+  nodeId: string;
+  name: string;
+  endpoint: string;
+  version: string;
+  status: NodeStatus;
+  tags: string[];
+  platformCount: number;
+  activeSessions: number;
+  os: string;
+  cpuCores: number;
+  memoryMB: number;
+  registeredAt: string;
+  lastHeartbeatAt: string;
+  lastDeployAt?: string;
+  lastDeployStatus?: 'success' | 'failed';
+  ipAddress?: string;
+}
+
+export type DeployTaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'cancelled';
+
+export interface DeployTaskInfo {
+  taskId: string;
+  nodeId: string;
+  targetVersion?: string;
+  status: DeployTaskStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMs?: number;
+  error?: string;
+}
+
+export interface DeployBatchInfo {
+  batchId: string;
+  name: string;
+  targetVersion?: string;
+  nodeIds: string[];
+  status: DeployTaskStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  createdBy?: string;
+}
+
+export interface RenewAllResult {
+  success: boolean;
+  total: number;
+  renewed: number;
+  stillLoggedIn: number;
+  failed: number;
+  results: Array<{
+    platform: string;
+    accountName: string;
+    success: boolean;
+    loggedIn: boolean;
+    error?: string;
+  }>;
+}
+
+// === 芯图EK · 企业知识库 ===
+
+export interface EkCombination {
+  key: string;
+  /** 组合引用次数（仅统计审核通过的文章） */
+  count: number;
+  memberIds: string[];
+  articles: Array<{
+    id: string;
+    title: string;
+    platform: string;
+    contentType: string;
+    status: string;
+    createdAt: string;
+  }>;
+}
+
+export interface EkKnowledgeData {
+  sessionId: string;
+  enterprise: { fullName: string; shortName?: string };
+  kbReady: boolean;
+  l2Sources: KnowledgeSource[];
+  aiCard: (AICard & { usageCount: number }) | null;
+  combinations: EkCombination[];
+  stats: {
+    l2Count: number;
+    l3Usage: number;
+    combinationCount: number;
+    totalCitations: number;
+    maxUsage: number;
+    minUsage: number;
+    articleCount: number;
+    approvedCount: number;
+    untrackedArticles: number;
+  };
+  generatedAt: string;
 }
 
 const BASE_URL = '/api';
@@ -89,6 +237,37 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
 }
 
 /**
+ * 直接返回整个 JSON 响应，不经过 data 字段提取。
+ * 用于那些返回格式不是 { success, data } 的 API（如直接代理 harvester 的 endpoints）。
+ */
+export async function requestRaw<T extends { success: boolean }>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> {
+  const apiKey = getApiKey();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['x-api-key'] = apiKey;
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers: { ...headers, ...(options?.headers as Record<string, string>) },
+    });
+  } catch {
+    throw new Error('无法连接后端服务，请确认 API 服务已启动');
+  }
+
+  const json = (await res.json()) as T;
+  if (!res.ok || !json.success) {
+    const err = (json as any).error ?? `Request failed (${res.status})`;
+    throw new ApiError(err, res.status);
+  }
+
+  return json;
+}
+
+/**
  * 封装 "设置 loading → 执行异步任务 → 捕获错误 → 重置 loading" 的通用模式。
  *
  * @param set       - Zustand set 函数
@@ -141,24 +320,9 @@ export const api = {
       body: JSON.stringify({ url }),
     }),
 
-  importPpt: (id: string, file: File) => {
-    const apiKey = getApiKey();
-    const formData = new FormData();
-    formData.append('file', file);
-    return fetch(`${BASE_URL}/session/${id}/import-ppt`, {
-      method: 'POST',
-      headers: {
-        ...(apiKey ? { 'x-api-key': apiKey } : {}),
-      },
-      body: formData,
-    }).then(async (res) => {
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error ?? `Request failed (${res.status})`);
-      }
-      return json.data as ImportPptResponse;
-    });
-  },
+  importPpt: (id: string, file: File) => importDocumentFile(id, file, 'import-ppt'),
+
+  importDocx: (id: string, file: File) => importDocumentFile(id, file, 'import-docx'),
 
   confirmProfileReview: (id: string, payload: ProfileReviewRequest) =>
     request<ProfileReviewResponse>(`/session/${id}/profile-review`, {
@@ -214,10 +378,29 @@ export const api = {
       method: 'POST',
     }),
 
+  // 使用者在平台手动发布后，回到系统标记文章为已发布
+  confirmPublished: (taskId: string, postUrl?: string) =>
+    request<{ taskId: string; status: string; publishedAt: string; platformPostUrl?: string }>(
+      `/publish/${encodeURIComponent(taskId)}/confirm-published`,
+      {
+        method: 'POST',
+        body: JSON.stringify(postUrl ? { postUrl } : {}),
+      },
+    ),
+
+  // 获取文章的发布任务列表
+  fetchPublishTasks: (articleId: string) =>
+    request<PublishTask[]>(`/publish?articleId=${encodeURIComponent(articleId)}`),
+
   deleteArticle: (id: string) =>
     request<void>(`/articles/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
+
+  // === 芯图EK · 企业知识库 ===
+
+  getEkKnowledge: (sessionId: string) =>
+    request<EkKnowledgeData>(`/knowledge/ek/${encodeURIComponent(sessionId)}`),
 
   // === Credentials ===
 
@@ -260,4 +443,81 @@ export const api = {
 
   getAiInfo: () =>
     request<AiInfo>('/monitor/ai-info'),
+
+  // === Profiles (persistent browser profiles) ===
+
+  listProfiles: () =>
+    requestRaw<{ success: boolean; total: number; profiles: ProfileInfo[] }>('/profiles').then(
+      (data) => data.profiles,
+    ),
+
+  checkProfileHealth: (platform: string, accountName: string) =>
+    requestRaw<ProfileHealthInfo>(
+      `/profiles/${encodeURIComponent(platform)}/${encodeURIComponent(accountName)}/health`,
+    ),
+
+  deleteProfile: (platform: string, accountName: string) =>
+    requestRaw<{ success: boolean; deleted: boolean }>(
+      `/profiles/${encodeURIComponent(platform)}/${encodeURIComponent(accountName)}`,
+      { method: 'DELETE' },
+    ),
+
+  renewProfile: (platform: string, accountName: string) =>
+    requestRaw<ProfileRenewResult>(
+      `/profiles/${encodeURIComponent(platform)}/${encodeURIComponent(accountName)}/renew`,
+      { method: 'POST' },
+    ),
+
+  renewAllProfiles: () =>
+    requestRaw<RenewAllResult>('/profiles/renew-all', { method: 'POST' }),
+
+  // === Node Management (cloud deployment) ===
+
+  listNodes: () =>
+    requestRaw<{ success: boolean; total: number; nodes: NodeInfo[] }>('/nodes').then((d) => d.nodes),
+
+  getNodesSummary: () =>
+    requestRaw<{ success: boolean; total: number; online: number; offline: number; deploying: number; totalPlatforms: number }>(
+      '/nodes/summary',
+    ),
+
+  createDeployBatch: (nodeIds: string[], name?: string, targetVersion?: string) =>
+    requestRaw<{ success: boolean; batch: DeployBatchInfo }>('/nodes/deploy/batch', {
+      method: 'POST',
+      body: JSON.stringify({ nodeIds, name, targetVersion }),
+    }),
+
+  listDeployBatches: (limit = 20) =>
+    requestRaw<{ success: boolean; batches: DeployBatchInfo[] }>(`/nodes/deploy/batches?limit=${limit}`).then((d) => d.batches),
+
+  getDeployBatch: (batchId: string) =>
+    requestRaw<{ success: boolean; batch: DeployBatchInfo; tasks: DeployTaskInfo[] }>(`/nodes/deploy/batches/${batchId}`),
+
+  cancelDeployBatch: (batchId: string) =>
+    requestRaw<{ success: boolean }>(`/nodes/deploy/batches/${batchId}/cancel`, { method: 'POST' }),
+
+  getDeployTaskLog: (taskId: string) =>
+    requestRaw<{ success: boolean; taskId: string; status: string; log: string[] }>(`/nodes/deploy/tasks/${taskId}/log`),
+
+  getNodeDeployHistory: (nodeId: string, limit = 10) =>
+    requestRaw<{ success: boolean; tasks: DeployTaskInfo[] }>(`/nodes/${nodeId}/deploy/tasks?limit=${limit}`).then((d) => d.tasks),
 };
+
+function importDocumentFile(id: string, file: File, endpoint: string): Promise<ImportPptResponse> {
+  const apiKey = getApiKey();
+  const formData = new FormData();
+  formData.append('file', file);
+  return fetch(`${BASE_URL}/session/${id}/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      ...(apiKey ? { 'x-api-key': apiKey } : {}),
+    },
+    body: formData,
+  }).then(async (res) => {
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error ?? `Request failed (${res.status})`);
+    }
+    return json.data as ImportPptResponse;
+  });
+}

@@ -5,6 +5,7 @@ import type { PlatformId } from '@zemingengine/shared';
 import { ArticleStatusBadge } from './ArticleStatusBadge.js';
 import { ReviewReport } from './ReviewReport.js';
 import { ExternalLink, AlertTriangle, CheckCircle2, PenSquare } from 'lucide-react';
+import { reviewPaths } from '../../utils/api-paths.js';
 
 const PLATFORM_LABELS: Record<string, string> = {
   weixin: '微信公众号',
@@ -24,6 +25,20 @@ const PLATFORM_LABELS: Record<string, string> = {
   qianwen: '千问',
 };
 
+// 各平台草稿箱地址，供使用者手动发布时跳转
+const PLATFORM_DRAFT_URLS: Record<string, string> = {
+  weixin: 'https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_list_v2&action=list&type=10&token=&lang=zh_CN',
+  zhihu: 'https://zhuanlan.zhihu.com/drafts',
+  baijia: 'https://baijiahao.baidu.com/builder/rc/content?type=draft',
+  toutiao: 'https://mp.toutiao.com/profile_v4/graphic/article_list?tab=draft',
+  csdn: 'https://mp.csdn.net/mp_blog/manage/article?type=draft',
+  juejin: 'https://juejin.cn/editor/drafts',
+  bilibili: 'https://member.bilibili.com/article-text/home?type=draft',
+  sohu: 'https://mp.sohu.com/mpfe/static/main/draft.html',
+  netease: 'https://mp.163.com/editor/draft.html',
+  zhidao: 'https://zhidao.baidu.com/',
+};
+
 interface Feedback {
   type: 'success' | 'error';
   msg: string;
@@ -38,7 +53,9 @@ export function ArticleDetail() {
     actionLoading,
     fetchReview,
     publishArticle,
+    waitForDraftSave,
     reviewArticle,
+    confirmPublished,
     deleteArticle,
   } = useArticleStore();
 
@@ -76,12 +93,35 @@ export function ArticleDetail() {
   const handlePublish = async () => {
     setFeedback(null);
     try {
+      // 第一步只是提交任务，平台侧草稿还没落盘，必须等真实结果再提示成功
       await publishArticle(article.id);
-      setFeedback({ type: 'success', msg: '已提交发布任务，正在发布到目标平台...' });
-    } catch (err) {
+      setFeedback({ type: 'success', msg: '已提交，正在保存到平台草稿箱，请稍候…' });
+      const result = await waitForDraftSave(article.id);
+      if (result.ok) {
+        setFeedback({
+          type: 'success',
+          msg: '草稿已保存到平台草稿箱，请点击「前往草稿箱」跳转到平台手动发布，发布完成后回来点击「标记已发布」。',
+        });
+      } else {
+        setFeedback({ type: 'error', msg: `草稿未保存成功：${result.error}` });
+      }
+    } catch (error) {
       setFeedback({
         type: 'error',
-        msg: err instanceof Error ? err.message : '发布失败',
+        msg: error instanceof Error ? error.message : '提交草稿箱失败',
+      });
+    }
+  };
+
+  const handleConfirmPublished = async () => {
+    setFeedback(null);
+    try {
+      await confirmPublished(article.id);
+      setFeedback({ type: 'success', msg: '已标记为已发布' });
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        msg: error instanceof Error ? error.message : '标记已发布失败',
       });
     }
   };
@@ -104,10 +144,10 @@ export function ArticleDetail() {
         setEditTitle(article.title || '');
         setEditSummary(article.summary || '');
       }
-    } catch (err) {
+    } catch (error) {
       setFeedback({
         type: 'error',
-        msg: err instanceof Error ? err.message : '重新审核失败',
+        msg: error instanceof Error ? error.message : '重新审核失败',
       });
     }
   };
@@ -116,7 +156,7 @@ export function ArticleDetail() {
     setFeedback(null);
     try {
       const apiKey = localStorage.getItem('apiKey') || '';
-      const resp = await fetch(`/api/reviews/${article.id}/manual-save`, {
+      const resp = await fetch(reviewPaths.manualSave(article.id), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
         body: JSON.stringify({
@@ -139,10 +179,10 @@ export function ArticleDetail() {
         // 刷新文章列表状态
         window.location.reload();
       }
-    } catch (err) {
+    } catch (error) {
       setFeedback({
         type: 'error',
-        msg: err instanceof Error ? err.message : '保存失败',
+        msg: error instanceof Error ? error.message : '保存失败',
       });
     }
   };
@@ -153,10 +193,10 @@ export function ArticleDetail() {
     try {
       await deleteArticle(article.id);
       setFeedback({ type: 'success', msg: '文章已删除' });
-    } catch (err) {
+    } catch (error) {
       setFeedback({
         type: 'error',
-        msg: err instanceof Error ? err.message : '删除失败',
+        msg: error instanceof Error ? error.message : '删除失败',
       });
     }
   };
@@ -164,7 +204,8 @@ export function ArticleDetail() {
   const canPublish =
     !actionLoading &&
     article.status !== 'publishing' &&
-    article.status !== 'published';
+    article.status !== 'published' &&
+    article.status !== 'draft_saved';
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50">
@@ -226,6 +267,18 @@ export function ArticleDetail() {
                 查看发布文章
               </a>
             )}
+            {article.status === 'draft_saved' && (
+              <a
+                href={article.publishUrl || PLATFORM_DRAFT_URLS[article.platform] || '#'}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-amber-600 hover:text-amber-700 hover:underline text-xs"
+                title={article.publishUrl ? '点击跳转到已保存的草稿编辑页' : '点击跳转到平台草稿箱手动发布'}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {article.publishUrl ? '已存草稿，直接跳转编辑 →' : '已存草稿，前往草稿箱发布 →'}
+              </a>
+            )}
             <span>
               类型：
               <span className="text-gray-700">
@@ -253,13 +306,36 @@ export function ArticleDetail() {
         {/* 操作按钮区 */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handlePublish}
-              disabled={!canPublish}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {actionLoading ? '处理中...' : '发布'}
-            </button>
+            {article.status !== 'draft_saved' && (
+              <button
+                onClick={handlePublish}
+                disabled={!canPublish}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {actionLoading ? '处理中...' : '提交草稿箱'}
+              </button>
+            )}
+            {article.status === 'draft_saved' && (
+              <>
+                <a
+                  href={article.publishUrl || PLATFORM_DRAFT_URLS[article.platform] || '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 transition-colors"
+                  title={article.publishUrl ? '点击跳转到已保存的草稿编辑页' : '点击跳转到平台草稿箱手动发布'}
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  {article.publishUrl ? '打开草稿编辑页' : '前往草稿箱发布'}
+                </a>
+                <button
+                  onClick={handleConfirmPublished}
+                  disabled={actionLoading}
+                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {actionLoading ? '处理中...' : '标记已发布'}
+                </button>
+              </>
+            )}
             <button
               onClick={handleReReview}
               disabled={actionLoading}

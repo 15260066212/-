@@ -7,17 +7,17 @@ describe('BrowserFingerprintManager', () => {
       const manager = new BrowserFingerprintManager();
       const result = manager.generateFingerprint();
 
-      expect(result).toBeDefined();
-      expect(result.fingerprint).toBeDefined();
-      expect(result.headers).toBeDefined();
+      expect(result).toBeDefined('should be defined for 生成有效的浏览器指纹');
+      expect(result.fingerprint).toBeDefined('should be defined for 生成有效的浏览器指纹');
+      expect(result.headers).toBeDefined('should be defined for 生成有效的浏览器指纹');
 
       // 检查核心指纹属性
       const { fingerprint } = result;
-      expect(fingerprint.navigator).toBeDefined();
-      expect(fingerprint.navigator.userAgent).toBeTruthy();
-      expect(fingerprint.screen).toBeDefined();
-      expect(fingerprint.screen.width).toBeGreaterThan(0);
-      expect(fingerprint.screen.height).toBeGreaterThan(0);
+      expect(fingerprint.navigator).toBeDefined('should be defined for 生成有效的浏览器指纹');
+      expect(fingerprint.navigator.userAgent).toBeTruthy('should be truthy when 生成有效的浏览器指纹');
+      expect(fingerprint.screen).toBeDefined('should be defined for 生成有效的浏览器指纹');
+      expect(fingerprint.screen.width).toBeGreaterThan(0, 'should be greater than expected for 生成有效的浏览器指纹');
+      expect(fingerprint.screen.height).toBeGreaterThan(0, 'should be greater than expected for 生成有效的浏览器指纹');
     });
 
     it('默认配置生成桌面端 + Chrome 指纹', () => {
@@ -25,11 +25,11 @@ describe('BrowserFingerprintManager', () => {
       const { fingerprint } = manager.generateFingerprint();
 
       // UA 应包含 Chrome
-      expect(fingerprint.navigator.userAgent.toLowerCase()).toContain('chrome');
+      expect(fingerprint.navigator.userAgent.toLowerCase()).toContain('chrome', 'should contain expected value in toLowerCase() for 默认配置生成桌面端 + Chrome 指纹');
       // 桌面端屏幕宽度应 >= 1366
-      expect(fingerprint.screen.width).toBeGreaterThanOrEqual(1366);
+      expect(fingerprint.screen.width).toBeGreaterThanOrEqual(1366, 'should be greater than or equal for 默认配置生成桌面端 + Chrome 指纹');
       // 语言应包含 zh-CN
-      expect(fingerprint.navigator.language.toLowerCase()).toContain('zh');
+      expect(fingerprint.navigator.language.toLowerCase()).toContain('zh', 'should contain expected value in toLowerCase() for 默认配置生成桌面端 + Chrome 指纹');
     });
 
     it('每次生成不同的指纹（随机化）', () => {
@@ -44,8 +44,8 @@ describe('BrowserFingerprintManager', () => {
 
       // 由于贝叶斯网络生成，大多数情况下会不同
       // 但我们不做强断言，只验证生成成功
-      expect(fp1Str).toBeTruthy();
-      expect(fp2Str).toBeTruthy();
+      expect(fp1Str).toBeTruthy('should be truthy when 每次生成不同的指纹（随机化）');
+      expect(fp2Str).toBeTruthy('should be truthy when 每次生成不同的指纹（随机化）');
     });
   });
 
@@ -55,10 +55,10 @@ describe('BrowserFingerprintManager', () => {
       const original = manager.generateFingerprint();
 
       const json = manager.serializeFingerprint(original);
-      expect(typeof json).toBe('string');
+      expect(typeof json).toBe('string', 'should have correct typeof json when serializeFingerprint 和 restoreFingerprint 往返一致');
 
       const restored = manager.restoreFingerprint(json);
-      expect(restored).toBeDefined();
+      expect(restored).toBeDefined('should be defined for serializeFingerprint 和 restoreFingerprint 往返一致');
       expect(restored.fingerprint.navigator.userAgent).toBe(
         original.fingerprint.navigator.userAgent,
       );

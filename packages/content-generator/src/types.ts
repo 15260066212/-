@@ -1,4 +1,4 @@
-import type { Article, PlatformId, ArticleContentType, ReviewFeedback } from '@zemingengine/shared';
+import type { Article, PlatformId, ArticleContentType, ReviewFeedback, KnowledgeSource } from '@zemingengine/shared';
 
 export interface GenerateRequest {
   sessionId: string;
@@ -13,6 +13,8 @@ export interface GenerateRequest {
   pipelineFeedback?: string;
   generationRound: number;
   reviewFeedback?: ReviewFeedback;
+  /** 本篇三层检索选中的信源，按 [S1]..[Sn] 编号注入 prompt */
+  citedSources?: KnowledgeSource[];
 }
 
 export interface GenerateResult {

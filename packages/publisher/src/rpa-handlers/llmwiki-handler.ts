@@ -12,14 +12,20 @@ import { RpaHandler } from './base.js';
  *
  * Usage: This is NOT registered as a primary handler. RPAEngine uses it
  * internally as a fallback when the primary handler fails.
+ *
+ * This class also manages the fallback enabled/disabled state and provides
+ * convenience methods (canUseLLMWikiFallback, tryFallback) used by RPAEngine
+ * to coordinate the fallback flow.
  */
 export class LLMWikiHandler extends RpaHandler {
   private llmwikiPublisher: any = null;
   private initPromise: Promise<any> | null = null;
+  private fallbackEnabled: boolean;
 
-  constructor() {
+  constructor(fallbackEnabled: boolean = true) {
     // Use a placeholder platform — this handler is not registered per-platform
     super('csdn' as PlatformId);
+    this.fallbackEnabled = fallbackEnabled;
   }
 
   /**
@@ -27,6 +33,66 @@ export class LLMWikiHandler extends RpaHandler {
    */
   supportsPlatform(platform: PlatformId): boolean {
     return !!getPlatformLLMWikiName(platform);
+  }
+
+  /**
+   * Enable or disable LLMWiki fallback at runtime.
+   */
+  setFallbackEnabled(enabled: boolean): void {
+    this.fallbackEnabled = enabled;
+    console.log(`[LLMWikiHandler] LLMWiki fallback: ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  /**
+   * Check if LLMWiki fallback should be attempted for a given platform.
+   * Combines the enabled flag with platform support check.
+   */
+  canUseLLMWikiFallback(platform: PlatformId): boolean {
+    if (!this.fallbackEnabled) return false;
+    return this.supportsPlatform(platform);
+  }
+
+  /**
+   * Try publishing via LLMWiki fallback.
+   * Called when the primary RPA handler fails.
+   *
+   * @param page - Playwright Page with cookies already injected
+   * @param article - Article to publish
+   * @param credentials - Platform credentials
+   * @param originalError - Optional error string from the primary handler failure (for logging)
+   * @returns PublishResult on success, null if fallback not available or failed
+   */
+  async tryFallback(
+    page: Page,
+    article: Article,
+    credentials: PlatformCredentials,
+    originalError?: string,
+  ): Promise<PublishResult | null> {
+    if (!this.canUseLLMWikiFallback(article.platform)) {
+      return null;
+    }
+
+    const platform = article.platform;
+    console.log(`[LLMWikiHandler] Primary handler failed for ${platform}, trying LLMWiki fallback...`);
+    if (originalError) {
+      console.log(`[LLMWikiHandler] Original error: ${originalError.substring(0, 200)}`);
+    }
+
+    try {
+      const fallbackResult = await this.publish(page, article, credentials);
+
+      if (fallbackResult.success) {
+        console.log(`[LLMWikiHandler] LLMWiki fallback succeeded for ${platform}!`);
+        return fallbackResult;
+      } else {
+        console.warn(`[LLMWikiHandler] LLMWiki fallback also failed for ${platform}: ${fallbackResult.error}`);
+        return null;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[LLMWikiHandler] LLMWiki fallback error for ${platform}:`, msg);
+      return null;
+    }
   }
 
   /**
@@ -175,5 +241,59 @@ export class LLMWikiHandler extends RpaHandler {
     }
 
     return result;
+  }
+
+  /**
+   * Save the article as a draft via LLMWiki fallback.
+   *
+   * Tries the LLMWiki publisher's saveDraft method if available; otherwise
+   * falls back to the default publish flow (inherited from RpaHandler).
+   */
+  async saveDraft(
+    page: Page,
+    article: Article,
+    credentials: PlatformCredentials,
+  ): Promise<PublishResult> {
+    const platform = article.platform;
+    const llmwikiPlatform = getPlatformLLMWikiName(platform);
+
+    if (!llmwikiPlatform) {
+      return {
+        success: false,
+        error: `No LLMWiki mapping for platform: ${platform}`,
+      };
+    }
+
+    try {
+      const publisher = await this.getPublisher();
+
+      // If the LLMWiki publisher supports saveDraft, use it
+      if (typeof publisher.saveDraft === 'function') {
+        const llmwikiArticle = {
+          title: article.title,
+          content: article.contentMarkdown || article.contentPlain || '',
+          tags: article.tags || [],
+          summary: article.summary || '',
+        };
+
+        const result = await publisher.saveDraft(page, llmwikiPlatform, llmwikiArticle);
+        const converted = this.convertResult(result);
+        if (converted.success) {
+          converted.verificationStatus = 'draft_saved';
+          converted.draftSaved = true;
+          converted.verificationMessage = 'Saved as draft via LLMWiki fallback. Manual publication required.';
+        }
+        return converted;
+      }
+
+      // No saveDraft support — fall back to publish (inherited default)
+      return this.publish(page, article, credentials);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return {
+        success: false,
+        error: `LLMWiki fallback saveDraft failed: ${message}`,
+      };
+    }
   }
 }

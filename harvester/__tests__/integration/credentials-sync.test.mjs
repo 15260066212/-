@@ -100,7 +100,7 @@ describe('POST /api/credentials/sync', () => {
 
   it('handles network errors gracefully', async () => {
     await request(app)
-      .put('/api/credentials/bilibili')
+      .put('/api/credentials/toutiaohao')
       .send({ type: 'cookie', data: { cookie: 'sess=123' }, status: 'active' });
 
     mockFetch.mockRejectedValue(new Error('Network error'));

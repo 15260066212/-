@@ -6,12 +6,12 @@ export class UserRepository {
 
   insertUser(user: User): void {
     const stmt = this.db.prepare(`
-      INSERT INTO users (id, username, display_name, role, api_key, created_at, last_active_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, username, display_name, role, api_key, password_hash, created_at, last_active_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       user.id, user.username, user.displayName, user.role,
-      user.apiKey, user.createdAt, user.lastActiveAt ?? null,
+      user.apiKey, user.passwordHash ?? null, user.createdAt, user.lastActiveAt ?? null,
     );
   }
 

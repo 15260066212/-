@@ -64,6 +64,24 @@ export abstract class RpaHandler {
   abstract publish(page: Page, article: Article, credentials: PlatformCredentials): Promise<PublishResult>;
 
   /**
+   * Save the article as a draft on the platform WITHOUT publishing it.
+   *
+   * Default implementation falls back to `publish()` — subclasses that
+   * support draft-saving should override this method to fill the editor
+   * and click a "save draft" button instead of the publish button.
+   *
+   * The returned PublishResult should have `success: true`,
+   * `verificationStatus: 'draft_saved'`, and `draftSaved: true`.
+   *
+   * @param page - Playwright Page with cookies already injected
+   * @param article - Article to save as draft
+   * @param credentials - Platform credentials (cookies, tokens, etc.)
+   */
+  async saveDraft(page: Page, article: Article, credentials: PlatformCredentials): Promise<PublishResult> {
+    return this.publish(page, article, credentials);
+  }
+
+  /**
    * Parse cookie string from credentials into Playwright cookie format.
    * @deprecated Use the standalone `parseCookies` function instead.
    */
@@ -280,6 +298,21 @@ export abstract class SimpleRpaHandler extends RpaHandler {
     '.publish-btn',
   ];
 
+  /**
+   * Draft / save-draft button selectors, tried in order by saveDraft().
+   * Override in subclasses for platform-specific buttons.
+   */
+  protected readonly draftButtonSelectors: string[] = [
+    'button:has-text("存草稿")',
+    'button:has-text("保存草稿")',
+    'button:has-text("存为草稿")',
+    'a:has-text("存草稿")',
+    'a:has-text("保存草稿")',
+    '.save-draft-btn',
+    '.btn-save-draft',
+    'button:has-text("保存")',
+  ];
+
   /** Whether a confirmation dialog appears after clicking publish. */
   protected readonly hasConfirmDialog: boolean = true;
 
@@ -316,61 +349,10 @@ export abstract class SimpleRpaHandler extends RpaHandler {
     }
 
     try {
-      // Step 1: Navigate to the editor page
-      await page.goto(getPlatformEditorUrl(this.platform)!, {
-        waitUntil: 'domcontentloaded',
-        timeout: this.timeouts.PAGE_NAVIGATION,
-      });
-
-      // Verify authentication by checking for login redirect
-      const currentUrl = page.url();
-      if (this.loginUrlKeywords.some((kw) => currentUrl.includes(kw))) {
-        await this.captureScreenshot(page, 'auth_failed');
-        return {
-          success: false,
-          error: `${this.platformDisplayName} authentication failed - cookies may be expired`,
-        };
+      const filled = await this.fillEditor(page, article);
+      if (!filled.ok) {
+        return { success: false, error: filled.error! };
       }
-
-      // Step 2 (hook): Enter the editor (no-op by default)
-      const editorReady = await this.enterEditor(page);
-      if (!editorReady) {
-        await this.captureScreenshot(page, 'editor_failed');
-        return { success: false, error: `Failed to enter editor on ${this.platformDisplayName}` };
-      }
-
-      // Step 3: Fill in the title
-      let titleFilled = false;
-      for (const sel of this.titleSelectors) {
-        if (await this.fillInput(page, sel, article.title)) {
-          titleFilled = true;
-          break;
-        }
-      }
-
-      if (!titleFilled) {
-        await this.captureScreenshot(page, 'title_failed');
-        return { success: false, error: `Failed to fill article title on ${this.platformDisplayName}` };
-      }
-
-      // Step 4: Fill in the content using the rich text editor
-      const contentFilled = await this.fillRichTextEditor(
-        page,
-        article.contentMarkdown,
-        this.contentEditorSelectors,
-      );
-      if (!contentFilled) {
-        await this.captureScreenshot(page, 'content_failed');
-        return { success: false, error: `Failed to fill article content on ${this.platformDisplayName}` };
-      }
-
-      // Step 5: Add tags if enabled and available
-      if (this.enableTags && article.tags.length > 0) {
-        await this.addTags(page, article.tags, [], this.maxTags);
-      }
-
-      // Step 6 (hook): Select category/channel (no-op by default)
-      await this.selectCategory(page);
 
       // Step 7: Click publish button
       await page.waitForTimeout(1500); // Wait for content to settle
@@ -427,6 +409,142 @@ export abstract class SimpleRpaHandler extends RpaHandler {
         error: err instanceof Error ? err.message : `Unknown ${this.platformDisplayName} RPA error`,
       };
     }
+  }
+
+  /**
+   * Save the article as a draft on the platform without publishing it.
+   *
+   * Reuses the same editor-filling steps as publish() (navigate → enterEditor
+   * → fill title → fill content → add tags → select category), but clicks the
+   * "save draft" button instead of the publish button.
+   *
+   * On success returns `verificationStatus: 'draft_saved'` and `draftSaved: true`.
+   */
+  async saveDraft(page: Page, article: Article, credentials: PlatformCredentials): Promise<PublishResult> {
+    const cookies = this.parseCookies(credentials, this.cookieDomain);
+
+    if (cookies.length === 0) {
+      return { success: false, error: `No cookies found in credentials for ${this.platformDisplayName}` };
+    }
+
+    try {
+      const filled = await this.fillEditor(page, article);
+      if (!filled.ok) {
+        return { success: false, error: filled.error! };
+      }
+
+      // Wait for content to settle, then click the save-draft button
+      await page.waitForTimeout(1500);
+
+      let draftClicked = false;
+      for (const sel of this.draftButtonSelectors) {
+        if (await this.clickElement(page, sel, this.timeouts.EXTENDED)) {
+          draftClicked = true;
+          break;
+        }
+      }
+
+      if (!draftClicked) {
+        await this.captureScreenshot(page, 'draft_save_failed');
+        return { success: false, error: `Failed to click save-draft button on ${this.platformDisplayName}` };
+      }
+
+      // Some platforms show a confirmation dialog after saving draft
+      if (this.hasConfirmDialog) {
+        await page.waitForTimeout(this.timeouts.LONG);
+        for (const sel of this.confirmButtonSelectors) {
+          if (await this.clickElement(page, sel, this.timeouts.DEFAULT)) {
+            break;
+          }
+        }
+      }
+
+      await page.waitForTimeout(this.timeouts.EXTRA_LONG);
+
+      const draftId = `${this.platform}_${Date.now()}`;
+      return {
+        success: true,
+        postId: draftId,
+        postUrl: page.url(),
+        verificationStatus: 'draft_saved',
+        verificationMessage: `Article saved as draft on ${this.platformDisplayName}. Manual publication required.`,
+        draftSaved: true,
+      };
+    } catch (err) {
+      await this.captureScreenshot(page, 'error');
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : `Unknown ${this.platformDisplayName} RPA error`,
+      };
+    }
+  }
+
+  /**
+   * Shared editor-filling steps used by both publish() and saveDraft().
+   * Performs: navigate → auth check → enterEditor → fill title → fill content
+   * → add tags → select category.
+   *
+   * Returns `{ ok: true }` on success, or `{ ok: false, error }` on failure
+   * (screenshots are already captured before returning).
+   */
+  protected async fillEditor(
+    page: Page,
+    article: Article,
+  ): Promise<{ ok: boolean; error?: string }> {
+    // Step 1: Navigate to the editor page
+    await page.goto(getPlatformEditorUrl(this.platform)!, {
+      waitUntil: 'domcontentloaded',
+      timeout: this.timeouts.PAGE_NAVIGATION,
+    });
+
+    // Verify authentication by checking for login redirect
+    const currentUrl = page.url();
+    if (this.loginUrlKeywords.some((kw) => currentUrl.includes(kw))) {
+      await this.captureScreenshot(page, 'auth_failed');
+      return { ok: false, error: `${this.platformDisplayName} authentication failed - cookies may be expired` };
+    }
+
+    // Step 2 (hook): Enter the editor (no-op by default)
+    const editorReady = await this.enterEditor(page);
+    if (!editorReady) {
+      await this.captureScreenshot(page, 'editor_failed');
+      return { ok: false, error: `Failed to enter editor on ${this.platformDisplayName}` };
+    }
+
+    // Step 3: Fill in the title
+    let titleFilled = false;
+    for (const sel of this.titleSelectors) {
+      if (await this.fillInput(page, sel, article.title)) {
+        titleFilled = true;
+        break;
+      }
+    }
+
+    if (!titleFilled) {
+      await this.captureScreenshot(page, 'title_failed');
+      return { ok: false, error: `Failed to fill article title on ${this.platformDisplayName}` };
+    }
+
+    // Step 4: Fill in the content using the rich text editor
+    const contentFilled = await this.fillRichTextEditor(
+      page,
+      article.contentMarkdown,
+      this.contentEditorSelectors,
+    );
+    if (!contentFilled) {
+      await this.captureScreenshot(page, 'content_failed');
+      return { ok: false, error: `Failed to fill article content on ${this.platformDisplayName}` };
+    }
+
+    // Step 5: Add tags if enabled and available
+    if (this.enableTags && article.tags.length > 0) {
+      await this.addTags(page, article.tags, [], this.maxTags);
+    }
+
+    // Step 6 (hook): Select category/channel (no-op by default)
+    await this.selectCategory(page);
+
+    return { ok: true };
   }
 
   // ─── Hook methods (override in subclass when needed) ──────────────────────

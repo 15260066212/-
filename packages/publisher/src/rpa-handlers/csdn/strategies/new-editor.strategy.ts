@@ -15,7 +15,10 @@ export class NewEditorStrategy extends BaseCsdnStrategy {
   readonly name = 'New Markdown Editor';
 
   async execute(page: Page, article: Article): Promise<PublishResult> {
-    let capturedResponse: { status: number; body: string } | null = null;
+    // Collect saveArticle responses captured AFTER clicking publish
+    // (auto-save responses before publish click are ignored)
+    let publishResponses: { status: number; body: string }[] = [];
+    let listening = false;
 
     try {
       // Step 1: Navigate to the new Markdown editor
@@ -34,13 +37,15 @@ export class NewEditorStrategy extends BaseCsdnStrategy {
       }
       console.log('[CSDN RPA-S1] Editor loaded at:', currentUrl);
 
-      // Step 2: Set up response listener for saveArticle
+      // Step 2: Set up response listener — starts collecting AFTER publish button click
       page.on('response', async (response) => {
-        if (response.url().includes('saveArticle')) {
+        if (!listening) return; // ignore auto-save before publish
+        const url = response.url();
+        if (url.includes('saveArticle') || url.includes('save_article') || url.includes('publishArticle')) {
           try {
             const body = await response.text();
-            capturedResponse = { status: response.status(), body };
-            console.log('[CSDN RPA-S1] saveArticle response:', response.status(), body.substring(0, 300));
+            publishResponses.push({ status: response.status(), body });
+            console.log(`[CSDN RPA-S1] Publish response captured: ${response.status()} ${body.substring(0, 200)}`);
           } catch {
             // body already consumed
           }
@@ -69,11 +74,17 @@ export class NewEditorStrategy extends BaseCsdnStrategy {
         await this.addTagsNewEditor(page, article.tags);
       }
 
-      // Step 6: Click "发布文章" button
+      // Step 6: Click "发布文章" button — START listening for publish responses
       console.log('[CSDN RPA-S1] Clicking "发布文章" button...');
       await page.waitForTimeout(this.timeouts.MEDIUM);
+
+      // Clear any stale responses and enable listener
+      publishResponses = [];
+      listening = true;
+
       const publishClicked = await this.clickPublishButton(page);
       if (!publishClicked) {
+        listening = false;
         await this.captureScreenshot(page, 's1_no_publish_btn');
         return { success: false, error: 'Could not find "发布文章" button in new editor' };
       }
@@ -82,19 +93,47 @@ export class NewEditorStrategy extends BaseCsdnStrategy {
       console.log('[CSDN RPA-S1] Handling publish dialog...');
       await this.handlePublishDialog(page);
 
-      // Step 8: Wait for saveArticle response
-      console.log('[CSDN RPA-S1] Waiting for saveArticle response...');
+      // Step 8: Wait for publish saveArticle response
+      console.log('[CSDN RPA-S1] Waiting for publish response...');
       let waitCount = 0;
-      while (!capturedResponse && waitCount < 30) {
+      while (publishResponses.length === 0 && waitCount < 40) {
         await page.waitForTimeout(this.timeouts.SHORT);
         waitCount++;
         if (waitCount % 10 === 0) {
-          console.log(`[CSDN RPA-S1] Still waiting... (${waitCount * 0.5}s)`);
+          console.log(`[CSDN RPA-S1] Still waiting for publish response... (${waitCount * 0.5}s)`);
         }
       }
 
-      if (capturedResponse) {
-        return this.parseSaveArticleResponse(capturedResponse, page.url());
+      // Try to find the best response — prefer one with article URL and published status
+      if (publishResponses.length > 0) {
+        // Sort: prefer responses with article URL (published) over draft saves
+        const sorted = [...publishResponses].sort((a, b) => {
+          const aHasUrl = this.responseHasArticleUrl(a.body);
+          const bHasUrl = this.responseHasArticleUrl(b.body);
+          if (aHasUrl !== bHasUrl) return aHasUrl ? -1 : 1;
+          return 0;
+        });
+        const result = this.parseSaveArticleResponse(sorted[0], page.url());
+        // Extra safety: if result says success but we're still on editor page,
+        // it might be a false positive (draft saved as published)
+        if (result.success && !result.postUrl?.includes('/article/details/')) {
+          const finalUrl = page.url();
+          if (finalUrl.includes('/article/details/')) {
+            result.postUrl = finalUrl;
+            result.postId = this.extractArticleIdFromUrl(finalUrl);
+            result.verificationStatus = 'verified';
+          } else if (!result.postUrl || result.postUrl.includes('editor.csdn.net')) {
+            console.warn('[CSDN RPA-S1] WARNING: API returned success but no valid article URL — likely saved as draft, not published');
+            return {
+              success: false,
+              draftSaved: true,
+              verificationStatus: 'draft_saved',
+              verificationMessage: 'saveArticle API returned success but article URL is missing. Article was likely saved as draft only.',
+              error: 'Article saved as draft only, not published. Publish button may not have been clicked correctly.',
+            };
+          }
+        }
+        return result;
       }
 
       // No API response captured — check if URL changed to article page

@@ -1,0 +1,28 @@
+# ============================================================
+# 多机部署主机配置模板
+# 用法：复制为 hosts.conf，按实际情况修改
+# ============================================================
+#
+# 每行一台机器，格式：
+#   [user@]host[:port]  [ssh_key_path]  [标签1,标签2,...]
+#
+# 字段说明：
+#   user         - SSH 用户名（默认 ubuntu）
+#   host         - 服务器 IP 或域名
+#   port         - SSH 端口（默认 22）
+#   ssh_key_path - SSH 私钥路径（可选，默认 ~/.ssh/id_rsa）
+#   tags         - 逗号分隔的标签，用于分组部署（可选）
+#
+# 示例：
+#   ubuntu@192.168.1.101:22  ~/.ssh/geo_key  prod,beijing
+#   ubuntu@192.168.1.102     ~/.ssh/geo_key  prod,shanghai
+#   deploy@10.0.0.5:2222                      test
+#
+# 以 # 开头的行为注释
+
+# === 生产环境 ===
+# ubuntu@prod-01.example.com  ~/.ssh/geo_prod  prod
+# ubuntu@prod-02.example.com  ~/.ssh/geo_prod  prod
+
+# === 测试环境 ===
+# ubuntu@test-01.example.com  ~/.ssh/geo_test  test

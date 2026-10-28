@@ -25,8 +25,8 @@ export class ArticleRepository {
       INSERT INTO articles (
         id, session_id, platform, content_type, title, content_markdown,
         content_html, content_plain, tags, summary, cover_image_desc,
-        word_count, status, generation_round, generation_meta, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        word_count, status, generation_round, generation_meta, cited_source_ids, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       article.id, article.sessionId, article.platform, article.contentType,
@@ -34,6 +34,7 @@ export class ArticleRepository {
       article.contentPlain ?? null, JSON.stringify(article.tags), article.summary ?? null,
       article.coverImageDesc ?? null, article.wordCount, article.status,
       article.generationRound, article.generationMeta ? JSON.stringify(article.generationMeta) : null,
+      article.citedSourceIds ? JSON.stringify(article.citedSourceIds) : null,
       article.createdAt, article.updatedAt
     );
   }
@@ -106,9 +107,23 @@ export class ArticleRepository {
       generationRound: Number(row.generation_round),
       reviewRound: Number(row.review_round ?? 0),
       publishUrl: row.publish_url ? String(row.publish_url) : undefined,
+      citedSourceIds: row.cited_source_ids ? this._safeParseSourceIds(String(row.cited_source_ids)) : undefined,
       generationMeta: row.generation_meta ? JSON.parse(String(row.generation_meta)) : undefined,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     };
+  }
+
+  /** 容错解析 cited_source_ids JSON（旧数据/异常数据不抛错） */
+  private _safeParseSourceIds(raw: string): string[] | undefined {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((v) => typeof v === 'string')) {
+        return parsed as string[];
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
   }
 }

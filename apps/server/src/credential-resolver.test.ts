@@ -34,9 +34,9 @@ describe('resolvePublishCredential', () => {
 
     const result = resolvePublishCredential(db as any, 'weixin', 'user1', { accountId: 'acc1' });
 
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(true, 'should have correct success flag when 指定账号且状态为 active 时直接返回');
     if (result.success) {
-      expect(result.credentials.accountId).toBe('acc1');
+      expect(result.credentials.accountId).toBe('acc1', 'should have correct accountId when 指定账号且状态为 active 时直接返回');
     }
     expect(db.credentials.getCredential).toHaveBeenCalledWith('weixin', 'user1', 'acc1');
   });
@@ -50,11 +50,11 @@ describe('resolvePublishCredential', () => {
 
     const result = resolvePublishCredential(db as any, 'weixin', 'user1', { accountId: 'acc1' });
 
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(true, 'should have correct success flag when 指定账号不存在时从平台池中查找备选');
     if (result.success) {
-      expect(result.credentials.accountId).toBe('acc2');
+      expect(result.credentials.accountId).toBe('acc2', 'should have correct accountId when 指定账号不存在时从平台池中查找备选');
     }
-    expect(db.credentials.getActiveCredentialsForPlatform).toHaveBeenCalled();
+    expect(db.credentials.getActiveCredentialsForPlatform).toHaveBeenCalled('should have been called for 指定账号不存在时从平台池中查找备选');
   });
 
   it('指定账号过期时从品牌池中查找备选', () => {
@@ -70,9 +70,9 @@ describe('resolvePublishCredential', () => {
       brandId: 1,
     });
 
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(true, 'should have correct success flag when 指定账号过期时从品牌池中查找备选');
     if (result.success) {
-      expect(result.credentials.accountId).toBe('brand-acc');
+      expect(result.credentials.accountId).toBe('brand-acc', 'should have correct accountId when 指定账号过期时从品牌池中查找备选');
     }
     expect(db.credentials.getActiveCredentialsForPlatformAndBrand).toHaveBeenCalledWith('weixin', 1, 'user1');
   });
@@ -82,10 +82,10 @@ describe('resolvePublishCredential', () => {
 
     const result = resolvePublishCredential(db as any, 'weixin', 'user1', { accountId: 'acc1' });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(false, 'should have correct success flag when 无任何可用凭证时返回失败和原因');
     if (!result.success) {
-      expect(result.reason).toContain('Cookie未采集');
-      expect(result.failureType).toBe('auth');
+      expect(result.reason).toContain('Cookie未采集', 'should contain expected value in reason for 无任何可用凭证时返回失败和原因');
+      expect(result.failureType).toBe('auth', 'should have correct failureType when 无任何可用凭证时返回失败和原因');
     }
   });
 
@@ -95,9 +95,9 @@ describe('resolvePublishCredential', () => {
 
     const result = resolvePublishCredential(db as any, 'weixin', 'user1', { accountId: 'acc1' });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(false, 'should have correct success flag when 主凭证过期且无备选时返回过期原因');
     if (!result.success) {
-      expect(result.reason).toContain('过期');
+      expect(result.reason).toContain('过期', 'should contain expected value in reason for 主凭证过期且无备选时返回过期原因');
     }
   });
 

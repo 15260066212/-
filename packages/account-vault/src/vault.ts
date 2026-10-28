@@ -10,6 +10,81 @@ import { encrypt, decrypt } from './crypto.js';
 import { initSessionTables } from '@zemingengine/shared';
 import type { AccountCredentials, AccountStatus, PlatformName, ProxyConfig, AccountVaultConfig, BrowserFingerprint } from './types.js';
 
+// ── Internal row types for database queries ──
+interface AccountRow {
+  account_id: string;
+  platform: PlatformName;
+  username: string;
+  encrypted_password: string;
+  phone: string | null;
+  proxy_id: string | null;
+  status: AccountStatus;
+  session_expires_at: number | null;
+  created_at: number;
+  last_login_at: number | null;
+  last_publish_at: number | null;
+  today_publish_count: number;
+  today_date: string;
+  daily_limit: number | null;
+  note: string | null;
+  group: string | null;
+  tags: string | null;
+  fingerprint_id: string | null;
+}
+
+interface ProxyRow {
+  id: string;
+  type: 'residential' | 'datacenter' | 'mobile';
+  host: string;
+  port: number;
+  username: string | null;
+  password: string | null;
+  bound_account_id: string | null;
+  region: string | null;
+  healthy: number;
+  last_health_check: number | null;
+  last_latency: number | null;
+}
+
+interface FingerprintRow {
+  fingerprint_id: string;
+  user_agent: string;
+  viewport_width: number;
+  viewport_height: number;
+  timezone: string;
+  locale: string;
+  platform_hardware: string;
+  webgl_vendor: string;
+  webgl_renderer: string;
+  canvas_noise: number;
+  hardware_concurrency: number;
+  device_memory: number;
+  created_at: number;
+  bound_account_id: string | null;
+}
+
+interface SessionRow {
+  account_id: string;
+  platform: string;
+  storage_state: string | null;
+  user_data_dir: string | null;
+  proxy_host: string | null;
+  proxy_port: number | null;
+  saved_at: number;
+  valid: number;
+  max_age: number | null;
+  fingerprint_id: string | null;
+}
+
+interface TodayStatRow {
+  platform: string;
+  today_count: number;
+}
+
+interface GroupRow {
+  group: string;
+}
+
 const DEFAULT_DAILY_LIMIT: Record<PlatformName, number> = {
   zhihu: 5,
   csdn: 2,
@@ -81,12 +156,24 @@ export class AccountVault {
     initSessionTables(this.db);
 
     // Migration: add columns if they don't exist (for existing databases)
-    try { this.db.exec('ALTER TABLE accounts ADD COLUMN "group" TEXT'); } catch {}
-    try { this.db.exec('ALTER TABLE accounts ADD COLUMN tags TEXT'); } catch {}
-    try { this.db.exec('ALTER TABLE accounts ADD COLUMN fingerprint_id TEXT'); } catch {}
-    try { this.db.exec('ALTER TABLE proxies ADD COLUMN healthy INTEGER DEFAULT 1'); } catch {}
-    try { this.db.exec('ALTER TABLE proxies ADD COLUMN last_health_check INTEGER'); } catch {}
-    try { this.db.exec('ALTER TABLE proxies ADD COLUMN last_latency INTEGER'); } catch {}
+    try { this.db.exec('ALTER TABLE accounts ADD COLUMN "group" TEXT'); } catch (err) {
+      console.debug('[Vault] Migration: group column already exists, skipping', { error: err instanceof Error ? err.message : String(err) });
+    }
+    try { this.db.exec('ALTER TABLE accounts ADD COLUMN tags TEXT'); } catch (err) {
+      console.debug('[Vault] Migration: tags column already exists, skipping', { error: err instanceof Error ? err.message : String(err) });
+    }
+    try { this.db.exec('ALTER TABLE accounts ADD COLUMN fingerprint_id TEXT'); } catch (err) {
+      console.debug('[Vault] Migration: fingerprint_id column already exists, skipping', { error: err instanceof Error ? err.message : String(err) });
+    }
+    try { this.db.exec('ALTER TABLE proxies ADD COLUMN healthy INTEGER DEFAULT 1'); } catch (err) {
+      console.debug('[Vault] Migration: healthy column already exists, skipping', { error: err instanceof Error ? err.message : String(err) });
+    }
+    try { this.db.exec('ALTER TABLE proxies ADD COLUMN last_health_check INTEGER'); } catch (err) {
+      console.debug('[Vault] Migration: last_health_check column already exists, skipping', { error: err instanceof Error ? err.message : String(err) });
+    }
+    try { this.db.exec('ALTER TABLE proxies ADD COLUMN last_latency INTEGER'); } catch (err) {
+      console.debug('[Vault] Migration: last_latency column already exists, skipping', { error: err instanceof Error ? err.message : String(err) });
+    }
   }
 
   // ── 账号CRUD ──
@@ -123,13 +210,13 @@ export class AccountVault {
   }
 
   getAccount(accountId: string): AccountCredentials | null {
-    const row = this.db.prepare('SELECT * FROM accounts WHERE account_id = ?').get(accountId) as any;
+    const row = this.db.prepare('SELECT * FROM accounts WHERE account_id = ?').get(accountId) as AccountRow | undefined;
     if (!row) return null;
     return this.rowToAccount(row);
   }
 
   getAccountByPlatform(platform: PlatformName, username: string): AccountCredentials | null {
-    const row = this.db.prepare('SELECT * FROM accounts WHERE platform = ? AND username = ?').get(platform, username) as any;
+    const row = this.db.prepare('SELECT * FROM accounts WHERE platform = ? AND username = ?').get(platform, username) as AccountRow | undefined;
     if (!row) return null;
     return this.rowToAccount(row);
   }
@@ -144,7 +231,7 @@ export class AccountVault {
     offset?: number;
   }): AccountCredentials[] {
     let sql = 'SELECT * FROM accounts WHERE 1=1';
-    const params: any[] = [];
+    const params: (string | number)[] = [];
     if (filter?.platform) { sql += ' AND platform = ?'; params.push(filter.platform); }
     if (filter?.status) { sql += ' AND status = ?'; params.push(filter.status); }
     if (filter?.proxyId) { sql += ' AND proxy_id = ?'; params.push(filter.proxyId); }
@@ -153,7 +240,7 @@ export class AccountVault {
     sql += ' ORDER BY created_at DESC';
     if (filter?.limit) { sql += ' LIMIT ?'; params.push(filter.limit); }
     if (filter?.offset) { sql += ' OFFSET ?'; params.push(filter.offset); }
-    const rows = this.db.prepare(sql).all(...params) as any[];
+    const rows = this.db.prepare(sql).all(...params) as AccountRow[];
     return rows.map(r => this.rowToAccount(r));
   }
 
@@ -166,7 +253,7 @@ export class AccountVault {
       AND today_date = ? AND today_publish_count < daily_limit
       ORDER BY today_publish_count ASC, last_publish_at ASC
       LIMIT 1
-    `).get(platform, today) as any;
+    `).get(platform, today) as AccountRow | undefined;
     if (!row) return null;
     return this.rowToAccount(row);
   }
@@ -180,13 +267,13 @@ export class AccountVault {
       AND today_date = ? AND today_publish_count < daily_limit
       ORDER BY today_publish_count ASC, last_publish_at ASC
       LIMIT ?
-    `).all(platform, today, limit) as any[];
+    `).all(platform, today, limit) as AccountRow[];
     return rows.map(r => this.rowToAccount(r));
   }
 
   /** 解密密码 */
   getPassword(accountId: string): string {
-    const row = this.db.prepare('SELECT encrypted_password FROM accounts WHERE account_id = ?').get(accountId) as any;
+    const row = this.db.prepare('SELECT encrypted_password FROM accounts WHERE account_id = ?').get(accountId) as { encrypted_password: string } | undefined;
     if (!row) throw new Error(`Account not found: ${accountId}`);
     return decrypt(row.encrypted_password);
   }
@@ -266,7 +353,7 @@ export class AccountVault {
 
   /** 批量检查所有代理健康状态 */
   checkAllProxies(): { proxyId: string; healthy: boolean; latency: number }[] {
-    const rows = this.db.prepare('SELECT id FROM proxies').all() as any[];
+    const rows = this.db.prepare('SELECT id FROM proxies').all() as { id: string }[];
     return rows.map(r => {
       const healthy = this.checkProxyHealth(r.id);
       const proxy = this.getProxy(r.id);
@@ -276,7 +363,7 @@ export class AccountVault {
 
   /** 获取健康代理 */
   getHealthyProxies(): ProxyConfig[] {
-    const rows = this.db.prepare('SELECT * FROM proxies WHERE healthy = 1').all() as any[];
+    const rows = this.db.prepare('SELECT * FROM proxies WHERE healthy = 1').all() as ProxyRow[];
     return rows.map(r => ({
       id: r.id, type: r.type, host: r.host, port: r.port,
       username: r.username || undefined, password: r.password || undefined,
@@ -286,7 +373,7 @@ export class AccountVault {
   }
 
   getProxy(proxyId: string): ProxyConfig | null {
-    const row = this.db.prepare('SELECT * FROM proxies WHERE id = ?').get(proxyId) as any;
+    const row = this.db.prepare('SELECT * FROM proxies WHERE id = ?').get(proxyId) as ProxyRow | undefined;
     if (!row) return null;
     return {
       id: row.id, type: row.type, host: row.host, port: row.port,
@@ -299,7 +386,7 @@ export class AccountVault {
 
   /** 获取代理关联的指纹配置 */
   getFingerprint(fingerprintId: string): BrowserFingerprint | null {
-    const row = this.db.prepare('SELECT * FROM fingerprints WHERE fingerprint_id = ?').get(fingerprintId) as any;
+    const row = this.db.prepare('SELECT * FROM fingerprints WHERE fingerprint_id = ?').get(fingerprintId) as FingerprintRow | undefined;
     if (!row) return null;
     return {
       userAgent: row.user_agent,
@@ -405,7 +492,7 @@ export class AccountVault {
 
   /** 检查 session 是否仍然有效（未过期） */
   isSessionValid(accountId: string, platform: PlatformName, maxAgeMs: number = 86400000): boolean {
-    const row = this.db.prepare('SELECT saved_at, valid, max_age FROM sessions WHERE account_id = ? AND platform = ?').get(accountId, platform) as any;
+    const row = this.db.prepare('SELECT saved_at, valid, max_age FROM sessions WHERE account_id = ? AND platform = ?').get(accountId, platform) as { saved_at: number; valid: number; max_age: number | null } | undefined;
     if (!row) return false;
     if (row.valid !== 1) return false;
     const age = Date.now() - row.saved_at;
@@ -417,7 +504,7 @@ export class AccountVault {
 
   /** 列出所有分组 */
   listGroups(): string[] {
-    const rows = this.db.prepare('SELECT DISTINCT "group" FROM accounts WHERE "group" IS NOT NULL').all() as any[];
+    const rows = this.db.prepare('SELECT DISTINCT "group" FROM accounts WHERE "group" IS NOT NULL').all() as GroupRow[];
     return rows.map(r => r.group);
   }
 
@@ -433,7 +520,7 @@ export class AccountVault {
 
   // ── 内部方法 ──
 
-  private rowToAccount(row: any): AccountCredentials {
+  private rowToAccount(row: AccountRow): AccountCredentials {
     return {
       platform: row.platform as PlatformName,
       accountId: row.account_id,

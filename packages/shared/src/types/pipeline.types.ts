@@ -85,6 +85,8 @@ export interface PipelineRequest {
   contentSupplement?: string;
   /** Hard cap on total articles generated this run (applied after plan/platform expansion) */
   maxArticles?: number;
+  /** Per-platform article count overrides (e.g. { zhihu: 5, toutiao: 3 }). Falls back to planDuration-based default when a platform key is absent. */
+  platformArticleCounts?: Partial<Record<PlatformId, number>>;
 }
 
 export interface PipelineStatus {
@@ -102,7 +104,7 @@ export interface PipelineStatus {
   run?: PipelineRun;
 }
 
-export type PipelineRunStatus = 'running' | 'completed' | 'cancelled' | 'failed';
+export type PipelineRunStatus = 'running' | 'paused' | 'completed' | 'cancelled' | 'failed';
 
 export interface PipelineRun {
   id: string;

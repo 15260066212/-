@@ -12,20 +12,17 @@ const PLATFORM_REQUIREMENTS: Record<PlatformId, {
 }> = {
   weixin: { minWordCount: 300, maxWordCount: 20000, maxTags: 5, minTags: 3, titleMaxLength: 64, needsCoverImage: true, contentFormat: 'html', notes: '微信公众号' },
   zhihu: { minWordCount: 500, maxWordCount: 50000, maxTags: 5, minTags: 1, titleMaxLength: 100, needsCoverImage: false, contentFormat: 'html', notes: '知乎专栏' },
-  baijia: { minWordCount: 600, maxWordCount: 30000, maxTags: 5, minTags: 3, titleMaxLength: 40, needsCoverImage: true, contentFormat: 'html', notes: '百家号' },
+  baike: { minWordCount: 300, maxWordCount: 20000, maxTags: 5, minTags: 1, titleMaxLength: 60, needsCoverImage: false, contentFormat: 'html', notes: '百度百科' },
   toutiao: { minWordCount: 400, maxWordCount: 30000, maxTags: 5, minTags: 3, titleMaxLength: 30, needsCoverImage: true, contentFormat: 'html', notes: '头条号' },
   csdn: { minWordCount: 300, maxWordCount: 50000, maxTags: 5, minTags: 1, titleMaxLength: 100, needsCoverImage: false, contentFormat: 'markdown', notes: 'CSDN' },
   juejin: { minWordCount: 500, maxWordCount: 50000, maxTags: 5, minTags: 1, titleMaxLength: 100, needsCoverImage: false, contentFormat: 'markdown', notes: '掘金' },
-  bilibili: { minWordCount: 200, maxWordCount: 20000, maxTags: 10, minTags: 1, titleMaxLength: 80, needsCoverImage: false, contentFormat: 'plain', notes: '哔哩哔哩' },
   sohu: { minWordCount: 400, maxWordCount: 30000, maxTags: 5, minTags: 1, titleMaxLength: 50, needsCoverImage: false, contentFormat: 'html', notes: '搜狐号' },
   netease: { minWordCount: 400, maxWordCount: 30000, maxTags: 5, minTags: 1, titleMaxLength: 50, needsCoverImage: false, contentFormat: 'html', notes: '网易号' },
-  zhidao: { minWordCount: 200, maxWordCount: 5000, maxTags: 5, minTags: 1, titleMaxLength: 50, needsCoverImage: false, contentFormat: 'plain', notes: '百度知道' },
 };
 
 const PLATFORM_TABOO_WORDS: Partial<Record<PlatformId, string[]>> = {
   csdn: ['加群', '私聊', '免费领取', '扫码'],
   zhihu: ['加微信', '私聊', '免费领取', '优惠券'],
-  baijia: ['微信号', '加群', '私聊', '代购'],
   toutiao: ['微信号', '加群', '私聊', '代购'],
 };
 
@@ -143,32 +140,6 @@ export function checkPlatformAdaptation(article: Article): ReviewIssue[] {
         severity: 'low',
         description: `${req.notes}技术内容缺少技术术语`,
         suggestion: '增加专业技术术语，提升内容在技术社区的权威性',
-      });
-    }
-  }
-
-  if (article.platform === 'bilibili') {
-    // B站专栏建议有互动引导
-    const hasInteraction = /关注|点赞|投币|收藏|三连|评论/.test(article.contentMarkdown);
-    if (!hasInteraction) {
-      issues.push({
-        dimension: 'platform_adaptation',
-        severity: 'low',
-        description: '哔哩哔哩内容建议包含互动引导语',
-        suggestion: '添加"关注/点赞/投币"等互动引导，提升用户参与度',
-      });
-    }
-  }
-
-  if (article.platform === 'zhidao') {
-    // 百度知道内容应为问答格式
-    const hasQA = /[？?]|如何|为什么|什么是|怎么办/.test(article.title);
-    if (!hasQA) {
-      issues.push({
-        dimension: 'platform_adaptation',
-        severity: 'low',
-        description: '百度知道内容建议使用问答式标题',
-        suggestion: '使用疑问式标题（如"如何…""什么是…"），符合平台问答属性',
       });
     }
   }

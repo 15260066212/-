@@ -5,22 +5,22 @@ describe('HarvesterBrowserValidator', () => {
   describe('构造与属性', () => {
     it('platform 属性正确设置', () => {
       const v = new HarvesterBrowserValidator('zhihu');
-      expect(v.platform).toBe('zhihu');
+      expect(v.platform).toBe('zhihu', 'should have correct platform when platform 属性正确设置');
     });
 
     it('csdn platform 属性正确', () => {
       const v = new HarvesterBrowserValidator('csdn');
-      expect(v.platform).toBe('csdn');
+      expect(v.platform).toBe('csdn', 'should have correct platform when csdn platform 属性正确');
     });
 
     it('harvesterPlatform 默认等于 platform', () => {
       const v = new HarvesterBrowserValidator('zhihu');
-      expect((v as any).harvesterPlatform).toBe('zhihu');
+      expect((v as any).harvesterPlatform).toBe('zhihu', 'should have correct harvesterPlatform when harvesterPlatform 默认等于 platform');
     });
 
     it('harvesterPlatform 使用自定义值', () => {
       const v = new HarvesterBrowserValidator('baijia', 'baijiahao');
-      expect((v as any).harvesterPlatform).toBe('baijiahao');
+      expect((v as any).harvesterPlatform).toBe('baijiahao', 'should have correct harvesterPlatform when harvesterPlatform 使用自定义值');
     });
 
     it('harvesterPlatform 与 platform 不同', () => {
@@ -38,8 +38,8 @@ describe('HarvesterBrowserValidator', () => {
         accountId: 'test',
         data: { cookie: 'session=abc' },
       } as any);
-      expect(result.valid).toBe(true);
-      expect(result.error).toBeUndefined();
+      expect(result.valid).toBe(true, 'should have correct valid flag when 未配置 RPA_REMOTE_URL 时默认 valid（降级不阻断）');
+      expect(result.error).toBeUndefined('should be undefined when 未配置 RPA_REMOTE_URL 时默认 valid（降级不阻断）');
     });
   });
 
@@ -55,8 +55,8 @@ describe('HarvesterBrowserValidator', () => {
         accountId: 'test',
         data: {},
       } as any);
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('cookie');
+      expect(result.valid).toBe(false, 'should have correct valid flag when 无 cookie 字段时返回 invalid');
+      expect(result.error).toContain('cookie', 'should contain expected value in error field for 无 cookie 字段时返回 invalid');
     });
 
     it('cookie 为空字符串时返回 invalid', async () => {
@@ -66,7 +66,7 @@ describe('HarvesterBrowserValidator', () => {
         accountId: 'test',
         data: { cookie: '' },
       } as any);
-      expect(result.valid).toBe(false);
+      expect(result.valid).toBe(false, 'should have correct valid flag when cookie 为空字符串时返回 invalid');
     });
 
     it('支持 cookies 字段（复数形式）', async () => {
@@ -88,7 +88,7 @@ describe('HarvesterBrowserValidator', () => {
         data: { cookies: 'session=abc' },
       } as any);
 
-      expect(result.valid).toBe(true);
+      expect(result.valid).toBe(true, 'should have correct valid flag when 支持 cookies 字段（复数形式）');
       vi.unstubAllGlobals();
     });
   });
@@ -118,11 +118,11 @@ describe('HarvesterBrowserValidator', () => {
         data: { cookie: 'session=abc' },
       } as any);
 
-      expect(result.valid).toBe(true);
-      expect(result.evidence?.pageTitle).toBe('知乎首页');
-      expect(result.evidence?.finalUrl).toBe('https://www.zhihu.com');
-      expect(result.evidence?.screenshot).toBeTruthy();
-      expect(result.durationMs).toBeGreaterThanOrEqual(0);
+      expect(result.valid).toBe(true, 'should have correct valid flag when Harvester 返回 valid 时标记成功');
+      expect(result.evidence?.pageTitle).toBe('知乎首页', 'should have correct pageTitle when Harvester 返回 valid 时标记成功');
+      expect(result.evidence?.finalUrl).toBe('https://www.zhihu.com', 'should have correct finalUrl when Harvester 返回 valid 时标记成功');
+      expect(result.evidence?.screenshot).toBeTruthy('should be truthy when Harvester 返回 valid 时标记成功');
+      expect(result.durationMs).toBeGreaterThanOrEqual(0, 'should be greater than or equal for Harvester 返回 valid 时标记成功');
       vi.unstubAllGlobals();
     });
 

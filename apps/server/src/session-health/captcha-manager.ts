@@ -32,69 +32,59 @@ export type CaptchaSource = 'publish' | 'login' | 'relogin' | 'session_check' | 
 
 export type CaptchaStatus = 'pending' | 'resolved' | 'expired' | 'ignored';
 
-/** Platform-specific captcha selectors. */
-const CAPTCHA_SELECTORS: Record<string, { selector: string; type: CaptchaType }[]> = {
+/** Common captcha selectors shared across most platforms. */
+const COMMON_CAPTCHA_SELECTORS: { selector: string; type: CaptchaType }[] = [
+  { selector: '.geetest', type: 'geetest' },
+  { selector: '.captcha', type: 'image' },
+  { selector: '#captcha', type: 'image' },
+];
+
+/** Platform-specific captcha selectors (only the additions beyond COMMON). */
+const PLATFORM_CAPTCHA_SELECTORS: Record<string, { selector: string; type: CaptchaType }[]> = {
   csdn: [
-    { selector: '.geetest', type: 'geetest' },
-    { selector: '.captcha', type: 'image' },
-    { selector: '#captcha', type: 'image' },
     { selector: '.verify-wrap', type: 'behavioral' },
     { selector: '.geetest_widget', type: 'geetest' },
     { selector: '.geetest_slider_button', type: 'slider' },
   ],
   zhihu: [
-    { selector: '.geetest', type: 'geetest' },
     { selector: '.Captcha', type: 'image' },
     { selector: '#js-captcha', type: 'image' },
     { selector: '.sign-container .captcha', type: 'image' },
     { selector: '.verify-modal', type: 'behavioral' },
   ],
   baijia: [
-    { selector: '.geetest', type: 'geetest' },
-    { selector: '.captcha', type: 'image' },
-    { selector: '#captcha', type: 'image' },
     { selector: '.verify-wrap', type: 'behavioral' },
     { selector: '.nc_wrapper', type: 'slider' },
   ],
   toutiao: [
-    { selector: '.captcha', type: 'image' },
-    { selector: '#captcha', type: 'image' },
-    { selector: '.geetest', type: 'geetest' },
     { selector: '.verify-modality', type: 'behavioral' },
     { selector: '.captcha_container', type: 'image' },
   ],
   juejin: [
-    { selector: '.geetest', type: 'geetest' },
-    { selector: '.captcha', type: 'image' },
-    { selector: '#captcha', type: 'image' },
     { selector: '.JCaptcha', type: 'image' },
   ],
   bilibili: [
-    { selector: '.geetest', type: 'geetest' },
-    { selector: '.captcha', type: 'image' },
-    { selector: '#captcha', type: 'image' },
     { selector: '.nc_wrapper', type: 'slider' },
     { selector: '.geetest_widget', type: 'geetest' },
   ],
-  sohu: [
-    { selector: '.captcha', type: 'image' },
-    { selector: '#captcha', type: 'image' },
-    { selector: '.geetest', type: 'geetest' },
-  ],
+  sohu: [],
   netease: [
-    { selector: '.captcha', type: 'image' },
-    { selector: '#captcha', type: 'image' },
-    { selector: '.geetest', type: 'geetest' },
     { selector: '.nc-container', type: 'slider' },
   ],
   zhidao: [
-    { selector: '.captcha', type: 'image' },
-    { selector: '#captcha', type: 'image' },
-    { selector: '.geetest', type: 'geetest' },
     { selector: '.verifyCode', type: 'image' },
   ],
   wechat: [],
 };
+
+/** Merged platform selectors: common + platform-specific. */
+const CAPTCHA_SELECTORS: Record<string, { selector: string; type: CaptchaType }[]> = (() => {
+  const result: Record<string, { selector: string; type: CaptchaType }[]> = {};
+  for (const platform of Object.keys(PLATFORM_CAPTCHA_SELECTORS)) {
+    result[platform] = [...COMMON_CAPTCHA_SELECTORS, ...PLATFORM_CAPTCHA_SELECTORS[platform]];
+  }
+  return result;
+})();
 
 /** Generic captcha selectors that apply to all platforms. */
 const GENERIC_CAPTCHA_SELECTORS: { selector: string; type: CaptchaType }[] = [

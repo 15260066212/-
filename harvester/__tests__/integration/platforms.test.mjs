@@ -38,7 +38,7 @@ describe('GET /api/platforms', () => {
     expect(platformIds).toContain('zhihu');
     expect(platformIds).toContain('csdn');
     expect(platformIds).toContain('juejin');
-    expect(platformIds).toContain('bilibili');
+    expect(platformIds).toContain('toutiaohao');
     expect(platformIds).toContain('wechat');
   });
 

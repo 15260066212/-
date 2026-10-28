@@ -1,37 +1,22 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { PublishTask } from '@zemingengine/shared';
 import {
   filterDueTasks,
   checkDispatchGuard,
   recoverStaleTasks,
 } from './publish-scheduler.js';
-
-function createMockTask(overrides: Partial<PublishTask> = {}): PublishTask {
-  const now = new Date();
-  return {
-    id: 'task-1',
-    articleId: 'article-1',
-    platform: 'weixin',
-    status: 'pending',
-    method: 'api',
-    retryCount: 0,
-    maxRetries: 2,
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-    ...overrides,
-  };
-}
+import { createMockPublishTask } from '../test-helpers.js';
 
 describe('filterDueTasks', () => {
   const now = Date.now();
 
   it('只返回 scheduledAt 已到的 pending/retrying 任务', () => {
     const tasks: PublishTask[] = [
-      createMockTask({ id: 't1', status: 'pending', scheduledAt: new Date(now - 1000).toISOString() }),
-      createMockTask({ id: 't2', status: 'pending', scheduledAt: new Date(now + 1000).toISOString() }),
-      createMockTask({ id: 't3', status: 'retrying', scheduledAt: new Date(now - 1000).toISOString() }),
-      createMockTask({ id: 't4', status: 'published', scheduledAt: new Date(now - 1000).toISOString() }),
-      createMockTask({ id: 't5', status: 'pending' }), // no scheduledAt
+      createMockPublishTask({ id: 't1', status: 'pending', scheduledAt: new Date(now - 1000).toISOString() }),
+      createMockPublishTask({ id: 't2', status: 'pending', scheduledAt: new Date(now + 1000).toISOString() }),
+      createMockPublishTask({ id: 't3', status: 'retrying', scheduledAt: new Date(now - 1000).toISOString() }),
+      createMockPublishTask({ id: 't4', status: 'published', scheduledAt: new Date(now - 1000).toISOString() }),
+      createMockPublishTask({ id: 't5', status: 'pending' }), // no scheduledAt
     ];
 
     const due = filterDueTasks(tasks, now);
@@ -43,13 +28,13 @@ describe('filterDueTasks', () => {
   });
 
   it('没有 scheduledAt 的任务不被视为到期', () => {
-    const tasks = [createMockTask({ status: 'pending' })];
+    const tasks = [createMockPublishTask({ status: 'pending' })];
     expect(filterDueTasks(tasks, now)).toEqual([]);
   });
 });
 
 describe('checkDispatchGuard', () => {
-  const task = createMockTask({ platform: 'weixin', accountId: 'acc1' });
+  const task = createMockPublishTask({ platform: 'weixin', accountId: 'acc1' });
   const now = Date.now();
 
   it('并发数达到上限时返回 concurrency', () => {
@@ -82,7 +67,7 @@ describe('checkDispatchGuard', () => {
   });
 
   it('accountId 为 undefined 时使用 default', () => {
-    const taskNoAccount = createMockTask({ platform: 'zhihu', accountId: undefined });
+    const taskNoAccount = createMockPublishTask({ platform: 'zhihu', accountId: undefined });
     const result = checkDispatchGuard(taskNoAccount, 0, new Set(), new Map(), now);
     expect(result.accountKey).toBe('zhihu:default');
   });
@@ -105,7 +90,7 @@ describe('recoverStaleTasks', () => {
   }
 
   it('将超过 5 分钟的 publishing 任务标记为 failed', () => {
-    const staleTask = createMockTask({ id: 'stale-1', status: 'publishing' as const, updatedAt: new Date(Date.now() - 6 * 60 * 1000).toISOString() });
+    const staleTask = createMockPublishTask({ id: 'stale-1', status: 'publishing' as const, updatedAt: new Date(Date.now() - 6 * 60 * 1000).toISOString() });
     const db = createMockDb([staleTask]);
 
     recoverStaleTasks(db as any);
@@ -119,7 +104,7 @@ describe('recoverStaleTasks', () => {
   });
 
   it('将 retrying 任务重置为 pending', () => {
-    const retryingTask = createMockTask({ id: 'retry-1', status: 'retrying' as const });
+    const retryingTask = createMockPublishTask({ id: 'retry-1', status: 'retrying' as const });
     const db = createMockDb([], [retryingTask]);
 
     recoverStaleTasks(db as any);

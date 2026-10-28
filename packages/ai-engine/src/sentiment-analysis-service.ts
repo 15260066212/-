@@ -63,9 +63,9 @@ export class SentimentAnalysisService {
 
     const withoutFence = raw.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
     const jsonText = extractJsonObject(withoutFence);
-    let parsed: any;
+    let parsed: Record<string, unknown>;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = JSON.parse(jsonText) as Record<string, unknown>;
     } catch {
       return this.neutral(SENTIMENT_UNAVAILABLE_REASON);
     }
@@ -77,7 +77,7 @@ export class SentimentAnalysisService {
     return { sentiment, reason, risk_terms: riskTerms };
   }
 
-  normalizeSentiment(value: any): 'positive' | 'neutral' | 'negative' {
+  normalizeSentiment(value: unknown): 'positive' | 'neutral' | 'negative' {
     const text = String(value || '').trim().toLowerCase();
     const map: Record<string, 'positive' | 'neutral' | 'negative'> = {
       正向: 'positive', 积极: 'positive', 正面: 'positive',
@@ -92,10 +92,10 @@ export class SentimentAnalysisService {
     return 'neutral';
   }
 
-  normalizeRiskTerms(value: any): string[] {
+  normalizeRiskTerms(value: unknown): string[] {
     const rows = Array.isArray(value) ? value : (value ? String(value).split(/[,，、;；/]/) : []);
     return rows
-      .map((item: any) => String(item || '').trim())
+      .map((item: unknown) => String(item || '').trim())
       .map((item: string) => this.sanitizeRiskTerm(item))
       .filter(Boolean)
       .slice(0, 10);
@@ -115,12 +115,12 @@ export class SentimentAnalysisService {
       .trim();
   }
 
-  sanitizeReason(value: any): string {
+  sanitizeReason(value: unknown): string {
     const cleaned = this.stripSensitiveTerms(String(value || ''));
     return (cleaned || '情绪判定完成').slice(0, 20);
   }
 
-  sanitizeRiskTerm(value: any): string {
+  sanitizeRiskTerm(value: unknown): string {
     return this.stripSensitiveTerms(String(value || '')).slice(0, 14);
   }
 
@@ -133,7 +133,7 @@ export class SentimentAnalysisService {
     let result;
     try {
       result = await aiPlatformService.queryPlatform('deepseek', question);
-    } catch (error: any) {
+    } catch {
       return this.neutral(SENTIMENT_UNAVAILABLE_REASON);
     }
     if (!result.success) {

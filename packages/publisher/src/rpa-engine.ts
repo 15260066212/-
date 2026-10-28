@@ -6,7 +6,9 @@ import { RpaHandler, parseCookies } from './rpa-handlers/base.js';
 import { PublicationVerifier } from './rpa/publication-verifier.js';
 import { RemotePublisher } from './rpa/remote-publisher.js';
 import { LLMWikiFallback } from './rpa/llmwiki-fallback.js';
-import { BrowserFingerprintManager } from './browser-fingerprint.js';
+// BrowserFingerprintManager is lazily imported to avoid loading
+// fingerprint-generator / fingerprint-injector at startup.
+// These native deps are only needed for local RPA mode (not remote mode).
 
 // Dynamic import of resolveStorageState to avoid circular dependency issues
 // (shared package is a dependency of publisher)
@@ -67,8 +69,9 @@ export class RPAEngine {
   private handlers: Map<PlatformId, RpaHandler> = new Map();
   private launchPromise: Promise<Browser> | null = null;
   private sessionPool?: ISessionPool;
-  private fingerprintManager: BrowserFingerprintManager;
+  private fingerprintManager: any = null;
   private fingerprintEnabled: boolean;
+  private fingerprintManagerPromise: Promise<any> | null = null;
 
   // Callback when a new fingerprint is generated — caller should persist it
   // to the credential store so the same fingerprint is reused next time.
@@ -85,9 +88,10 @@ export class RPAEngine {
 
   constructor(sessionPool?: ISessionPool) {
     this.sessionPool = sessionPool;
-    // Initialize fingerprint manager for consistent browser fingerprints
+    // Fingerprint manager is lazily initialized only when needed
+    // (local RPA mode + fingerprint enabled) to avoid loading heavy
+    // native dependencies at startup in remote mode deployments.
     this.fingerprintEnabled = process.env.RPA_FINGERPRINT !== 'false';
-    this.fingerprintManager = new BrowserFingerprintManager();
     // Handlers are registered externally (via Publisher layer), not here.
     // RPAEngine is a pure execution engine — it does not know or care which
     // platforms are supported. The Publisher decides which handlers to load.
@@ -98,6 +102,24 @@ export class RPAEngine {
     // Enable LLMWiki fallback by default, can be disabled via env var
     const fallbackEnabled = process.env.RPA_LLMWIKI_FALLBACK !== 'false';
     this.llmWikiFallback = new LLMWikiFallback(fallbackEnabled);
+  }
+
+  /**
+   * Lazily load the BrowserFingerprintManager.
+   * Only called when actually needed (local RPA mode + fingerprint enabled).
+   */
+  private async getFingerprintManager(): Promise<any> {
+    if (this.fingerprintManager) return this.fingerprintManager;
+    if (this.fingerprintManagerPromise) return this.fingerprintManagerPromise;
+
+    this.fingerprintManagerPromise = (async () => {
+      const { BrowserFingerprintManager } = await import('./browser-fingerprint.js');
+      this.fingerprintManager = new BrowserFingerprintManager();
+      this.fingerprintManagerPromise = null;
+      return this.fingerprintManager;
+    })();
+
+    return this.fingerprintManagerPromise;
   }
 
   /** Number of registered handlers (exposes handler map size for inspection). */
@@ -248,7 +270,7 @@ export class RPAEngine {
   ): Promise<PublishResult> {
     // Remote mode: delegate entirely to the harvester service
     if (this.isRemoteMode()) {
-      return this.remotePublisher.publish(article, credentials, accountId);
+      return this.remotePublisher.remotePublish(credentials.platform as PlatformId, article, credentials);
     }
 
     const handler = this.handlers.get(credentials.platform);
@@ -279,14 +301,15 @@ export class RPAEngine {
         // Fingerprint: use persisted fingerprint if available, otherwise generate new one.
         // Consistent fingerprints across sessions reduce "device change" detection.
         if (this.fingerprintEnabled) {
-          const { fingerprint, isNew } = this.fingerprintManager.getOrGenerateFingerprint(credData);
+          const fpMgr = await this.getFingerprintManager();
+          const { fingerprint, isNew } = fpMgr.getOrGenerateFingerprint(credData);
           const contextOpts: any = {};
 
           if (storageState && storageState.cookies.length > 0) {
             contextOpts.storageState = storageState;
           }
 
-          context = await this.fingerprintManager.createContextWithFingerprint(
+          context = await fpMgr.createContextWithFingerprint(
             browser,
             fingerprint,
             contextOpts,
@@ -294,7 +317,7 @@ export class RPAEngine {
 
           // If this is a new fingerprint, notify caller to persist it
           if (isNew && this.onFingerprintGenerated) {
-            const fpJson = this.fingerprintManager.serializeFingerprint(fingerprint);
+            const fpJson = fpMgr.serializeFingerprint(fingerprint);
             await Promise.resolve(
               this.onFingerprintGenerated(credentials.platform, accountId, fpJson),
             );
@@ -302,7 +325,7 @@ export class RPAEngine {
 
           // Fallback: add cookies if no storageState was available
           if (!storageState || storageState.cookies.length === 0) {
-            const cookies = parseCookies(credentials);
+            const cookies = parseCookies(credentials, '');
             if (cookies.length > 0) {
               await context.addCookies(cookies);
             }
@@ -315,7 +338,7 @@ export class RPAEngine {
         } else {
           // Fallback: legacy cookie injection
           context = await browser.newContext();
-          const cookies = parseCookies(credentials);
+          const cookies = parseCookies(credentials, '');
           if (cookies.length > 0) {
             await context.addCookies(cookies);
           }
@@ -326,14 +349,18 @@ export class RPAEngine {
       const result = await handler.publish(page, article, credentials);
 
       // Best-effort publication verification
-      if (result.success && result.url) {
-        const verified = await this.publicationVerifier.verify(
-          page,
-          result.url,
-          article,
-          credentials.platform,
-        );
-        result.verificationStatus = verified;
+      if (result.success && result.postUrl) {
+        try {
+          const verification = await this.publicationVerifier.verifyPublication(
+            page,
+            result.postUrl,
+            credentials.platform,
+          );
+          result.verificationStatus = verification.status === 'verified' ? 'verified' : 'unverified';
+          result.verificationMessage = verification.message;
+        } catch {
+          // verification is best-effort, ignore errors
+        }
       }
 
       return result;
@@ -341,17 +368,120 @@ export class RPAEngine {
       const message = err instanceof Error ? err.message : String(err);
 
       // Attempt LLMWiki fallback on failure
-      if (this.llmWikiFallback.isEnabled()) {
-        const fallbackResult = await this.llmWikiFallback.tryFallback(
-          article,
-          credentials,
-          accountId,
-        );
-        if (fallbackResult.success) {
-          return fallbackResult;
+      if (this.llmWikiFallback.canUseLLMWikiFallback(credentials.platform)) {
+        try {
+          const fallbackResult = await (this.llmWikiFallback as any).tryFallback?.(
+            article,
+            credentials,
+            accountId,
+          );
+          if (fallbackResult?.success) {
+            return fallbackResult;
+          }
+        } catch {
+          // fallback failed, return original error
         }
       }
 
+      return {
+        success: false,
+        error: message,
+      };
+    } finally {
+      if (context && !this.sessionPool) {
+        await context.close();
+      } else if (context && this.sessionPool) {
+        await this.sessionPool.releaseContext(accountId, credentials.platform);
+      }
+    }
+  }
+
+  /**
+   * Save an article as a draft on a platform using the registered RPA handler.
+   *
+   * Mirrors publish() but calls `handler.saveDraft()` instead of
+   * `handler.publish()`. Publication verification is skipped for drafts
+   * since the article is not yet live.
+   */
+  async saveDraft(
+    article: Article,
+    credentials: PlatformCredentials,
+    accountId: string,
+  ): Promise<PublishResult> {
+    // Remote mode: delegate to the harvester service (draft mode)
+    if (this.isRemoteMode()) {
+      return this.remotePublisher.remotePublish(credentials.platform as PlatformId, article, credentials);
+    }
+
+    const handler = this.handlers.get(credentials.platform);
+    if (!handler) {
+      return {
+        success: false,
+        error: `No RPA handler registered for platform: ${credentials.platform}`,
+      };
+    }
+
+    const browser = await this.launch();
+    let context: BrowserContext | null = null;
+
+    try {
+      if (this.sessionPool) {
+        context = await this.sessionPool.acquireContext({
+          platform: credentials.platform,
+          accountId,
+        });
+      } else {
+        const storageState = await getStorageState(credentials);
+        const credData = credentials.data as Record<string, unknown>;
+
+        if (this.fingerprintEnabled) {
+          const fpMgr = await this.getFingerprintManager();
+          const { fingerprint, isNew } = fpMgr.getOrGenerateFingerprint(credData);
+          const contextOpts: any = {};
+
+          if (storageState && storageState.cookies.length > 0) {
+            contextOpts.storageState = storageState;
+          }
+
+          context = await fpMgr.createContextWithFingerprint(
+            browser,
+            fingerprint,
+            contextOpts,
+          );
+
+          if (isNew && this.onFingerprintGenerated) {
+            const fpJson = fpMgr.serializeFingerprint(fingerprint);
+            await Promise.resolve(
+              this.onFingerprintGenerated(credentials.platform, accountId, fpJson),
+            );
+          }
+
+          if (!storageState || storageState.cookies.length === 0) {
+            const cookies = parseCookies(credentials, '');
+            if (cookies.length > 0) {
+              await context.addCookies(cookies);
+            }
+          }
+        } else if (storageState && storageState.cookies.length > 0) {
+          context = await browser.newContext({
+            storageState: storageState as any,
+          });
+        } else {
+          context = await browser.newContext();
+          const cookies = parseCookies(credentials, '');
+          if (cookies.length > 0) {
+            await context.addCookies(cookies);
+          }
+        }
+      }
+
+      const page = await context.newPage();
+      const result = await handler.saveDraft(page, article, credentials);
+
+      // No publication verification for drafts — the article is not live yet.
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         error: message,

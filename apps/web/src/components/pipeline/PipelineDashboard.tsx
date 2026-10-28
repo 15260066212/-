@@ -31,6 +31,7 @@ const STATUS_CARDS: { key: keyof StatusCounts; label: string; color: string; pul
   { key: 'approved', label: '已通过', color: 'text-primary' },
   { key: 'publishing', label: '发布中', color: 'text-purple-600', pulse: true },
   { key: 'published', label: '已发布', color: 'text-success' },
+  { key: 'draft_saved', label: '仅存草稿', color: 'text-amber-600' },
   { key: 'failed', label: '失败', color: 'text-error' },
 ];
 
@@ -40,6 +41,7 @@ interface StatusCounts {
   approved: number;
   publishing: number;
   published: number;
+  draft_saved: number;
   failed: number;
 }
 
@@ -70,6 +72,7 @@ export function PipelineDashboard({ sessionId: _sessionId }: Props) {
     approved: status.approved,
     publishing: status.publishing,
     published: status.published,
+    draft_saved: status.draft_saved ?? 0,
     failed: status.failed,
   };
 

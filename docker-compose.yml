@@ -32,10 +32,13 @@ services:
 
   # Cookie Harvester Service (Playwright + noVNC)
   harvester:
-    image: geo-harvester:latest
+    build:
+      context: .
+      dockerfile: apps/harvester/Dockerfile
     container_name: geo-harvester
     restart: unless-stopped
     environment:
+      - NODE_ENV=production
       - PORT=3003
       - NOVNC_BASE_URL=/novnc
     ports:

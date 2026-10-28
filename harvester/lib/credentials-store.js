@@ -42,15 +42,15 @@ function saveCredentials(filePath, data) {
 }
 
 /**
- * Get credentials for a specific platform.
+ * Get credentials for a specific key.
  *
  * @param {string} filePath - Path to credentials JSON file
- * @param {string} platform - Platform name
+ * @param {string} key - Credential key (e.g. "accountName:platform")
  * @returns {object|null} Credential data or null
  */
-function getCredential(filePath, platform) {
+function getCredential(filePath, key) {
   const creds = loadCredentials(filePath);
-  return creds[platform] || null;
+  return creds[key] || null;
 }
 
 /**
@@ -64,19 +64,19 @@ function getAllCredentials(filePath) {
 }
 
 /**
- * Insert or update credentials for a platform.
- * Automatically sets platform key and updatedAt timestamp.
+ * Insert or update credentials for a key.
+ * Automatically sets key and updatedAt timestamp.
  *
  * @param {string} filePath - Path to credentials JSON file
- * @param {string} platform - Platform name
+ * @param {string} key - Credential key (e.g. "accountName:platform")
  * @param {object} data - Credential data to upsert
  * @returns {boolean} true if save succeeded
  */
-function upsertCredential(filePath, platform, data) {
+function upsertCredential(filePath, key, data) {
   const creds = loadCredentials(filePath);
-  creds[platform] = {
+  creds[key] = {
     ...data,
-    platform,
+    platform: key,
     updatedAt: new Date().toISOString(),
   };
   return saveCredentials(filePath, creds);

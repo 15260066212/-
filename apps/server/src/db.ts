@@ -16,6 +16,8 @@ import { PipelineRepository } from './repositories/pipeline-repository.js';
 import { MonitorRepository } from './repositories/monitor-repository.js';
 import { UserRepository } from './repositories/user-repository.js';
 import { PlanRepository } from './repositories/plan-repository.js';
+import { MilvusRepository } from './repositories/milvus-repository.js';
+import { createEmbeddingProvider } from './services/embedding.js';
 
 // === Server-side types (not in shared package) ===
 
@@ -72,6 +74,11 @@ export class DatabaseAccess {
   public readonly monitor: MonitorRepository;
   public readonly users: UserRepository;
   public readonly plans: PlanRepository;
+  /**
+   * Milvus 向量存储 — 芯图EK 知识库 L2 信源语义召回。
+   * 未配置 MILVUS_URI 时为 null，检索逻辑自动回退到纯编译式 usageCount 均衡。
+   */
+  public readonly milvus: MilvusRepository | null;
 
   constructor(private db: DB) {
     this.sessions = new SessionRepository(db);
@@ -84,6 +91,29 @@ export class DatabaseAccess {
     this.monitor = new MonitorRepository(db);
     this.users = new UserRepository(db);
     this.plans = new PlanRepository(db);
+
+    const milvusUri = process.env.MILVUS_URI;
+    if (milvusUri) {
+      try {
+        const embedding = createEmbeddingProvider();
+        if (embedding) {
+          this.milvus = new MilvusRepository(
+            milvusUri,
+            embedding,
+            process.env.MILVUS_API_KEY,
+          );
+          console.log(`[Database] Milvus enabled uri=${milvusUri} embedding=${embedding.model} dim=${embedding.dim}`);
+        } else {
+          this.milvus = null;
+          console.warn('[Database] MILVUS_URI 已设置但 embedding provider 初始化失败，Milvus 已禁用');
+        }
+      } catch (e) {
+        this.milvus = null;
+        console.warn('[Database] Milvus 初始化失败，回退到纯 SQLite:', e instanceof Error ? e.message : e);
+      }
+    } else {
+      this.milvus = null;
+    }
   }
 
   // === Transactions ===

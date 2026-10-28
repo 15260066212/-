@@ -10,8 +10,15 @@ export interface PublishResult {
   postId?: string;
   postUrl?: string;
   error?: string;
-  verificationStatus?: 'verified' | 'unverified' | 'failed' | 'api_confirmed';
+  verificationStatus?: 'verified' | 'unverified' | 'failed' | 'api_confirmed' | 'draft_saved';
   verificationMessage?: string;
+  /**
+   * When true, the article was saved as a draft on the platform
+   * (not actually published). The caller should treat this as a
+   * partial success — the content is on the platform but needs
+   * manual publishing action.
+   */
+  draftSaved?: boolean;
 }
 
 export type FailureType =
@@ -20,6 +27,7 @@ export type FailureType =
   | 'rate_limit'
   | 'content'
   | 'platform'
+  | 'draft_saved'
   | 'unknown';
 
 export interface FailureAnalysis {
@@ -170,5 +178,18 @@ const FAILURE_RULES: Array<{
     ],
     retryable: true,
     retryDelayMs: 10000,
+  },
+  {
+    type: 'draft_saved',
+    category: '仅存草稿',
+    description: '文章仅保存为草稿，未真正发布到平台',
+    patterns: [
+      /draft only/,
+      /saved as draft/,
+      /仅存草稿/,
+      /草稿/,
+    ],
+    retryable: true,
+    retryDelayMs: 15000,
   },
 ];

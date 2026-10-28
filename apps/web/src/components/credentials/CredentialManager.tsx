@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { PlatformCredentials, PlatformId } from '@zemingengine/shared';
 import { useCredentialStore } from '../../stores/credentialStore.js';
 
-const PLATFORM_LABELS: Record<PlatformId, string> = {
+const PLATFORM_LABELS: Record<string, string> = {
   weixin: '微信公众号',
   zhihu: '知乎',
   baijia: '百家号',
@@ -16,9 +16,9 @@ const PLATFORM_LABELS: Record<PlatformId, string> = {
 };
 
 const ALL_PLATFORMS: PlatformId[] = [
-  'weixin', 'zhihu', 'baijia', 'toutiao',
-  'csdn', 'juejin', 'bilibili',
-  'sohu', 'netease', 'zhidao',
+  'weixin', 'zhihu', 'toutiao',
+  'csdn', 'juejin',
+  'sohu', 'netease',
 ];
 
 const CRED_TYPE_LABELS: Record<PlatformCredentials['type'], string> = {

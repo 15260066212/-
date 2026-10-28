@@ -1,0 +1,35 @@
+{
+  "name": "@zemingengine/wechatsync-core",
+  "version": "2.0.0-vendored",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "import": "./dist/adapters/index.mjs",
+      "require": "./dist/adapters/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.mjs",
+      "require": "./dist/runtime/index.js"
+    }
+  },
+  "dependencies": {
+    "js-md5": "^0.8.3",
+    "jszip": "^3.10.1",
+    "juice": "^11.1.0",
+    "linkedom": "^0.18.12",
+    "markdown-draft-js": "^2.4.0",
+    "marked": "^17.0.1",
+    "remarkable": "^2.0.1",
+    "turndown": "^7.2.2"
+  }
+}

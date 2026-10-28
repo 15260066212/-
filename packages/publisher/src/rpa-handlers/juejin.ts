@@ -98,4 +98,76 @@ export class JuejinRpaHandler extends RpaHandler {
       };
     }
   }
+
+  /**
+   * Save the article as a Juejin draft without publishing.
+   *
+   * Fills the title and Markdown content, then clicks the "存草稿" button.
+   * The article remains in the Juejin draft box until the user manually
+   * publishes it.
+   */
+  async saveDraft(page: Page, article: Article, credentials: PlatformCredentials): Promise<PublishResult> {
+    const domain = '.juejin.cn';
+    const cookies = this.parseCookies(credentials, domain);
+
+    if (cookies.length === 0) {
+      return { success: false, error: 'No cookies found in credentials for Juejin' };
+    }
+
+    try {
+      await page.goto(getPlatformEditorUrl(this.platform)!, {
+        waitUntil: 'domcontentloaded',
+        timeout: this.timeouts.PAGE_NAVIGATION,
+      });
+
+      if (page.url().includes('login') || page.url().includes('sign')) {
+        await this.captureScreenshot(page, 'auth_failed');
+        return { success: false, error: 'Juejin authentication failed - cookies may be expired' };
+      }
+
+      // Fill title
+      const titleFilled = await this.fillInput(page, 'input.draft_title, textarea[placeholder*="标题"]', article.title)
+        || await this.fillInput(page, '.title-input input', article.title);
+      if (!titleFilled) {
+        return { success: false, error: 'Failed to fill article title on Juejin' };
+      }
+
+      // Fill content
+      const contentFilled = await this.fillRichTextEditor(page, article.contentMarkdown, [
+        '.CodeMirror',
+        '.mono-editor',
+      ]);
+      if (!contentFilled) {
+        return { success: false, error: 'Failed to fill article content on Juejin' };
+      }
+
+      // Click save-draft button
+      await page.waitForTimeout(this.timeouts.MEDIUM);
+      const draftClicked = await this.clickElement(page, 'button:has-text("存草稿")', this.timeouts.EXTENDED)
+        || await this.clickElement(page, 'button:has-text("保存草稿")', this.timeouts.DEFAULT)
+        || await this.clickElement(page, '.save-draft-btn', this.timeouts.DEFAULT);
+
+      if (!draftClicked) {
+        await this.captureScreenshot(page, 'draft_save_failed');
+        return { success: false, error: 'Failed to click save-draft button on Juejin' };
+      }
+
+      await page.waitForTimeout(this.timeouts.EXTRA_LONG);
+
+      return {
+        success: true,
+        postId: `juejin_${Date.now()}`,
+        postUrl: page.url(),
+        verificationStatus: 'draft_saved',
+        verificationMessage: 'Article saved to Juejin draft box. Manual publication required.',
+        draftSaved: true,
+      };
+    } catch (err) {
+      await this.captureScreenshot(page, 'error');
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown Juejin RPA error',
+      };
+    }
+  }
 }

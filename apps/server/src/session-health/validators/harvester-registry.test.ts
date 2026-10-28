@@ -5,8 +5,8 @@ import {
 } from './harvester-registry.js';
 
 describe('HARVESTER_PLATFORMS 配置', () => {
-  it('注册了 9 个平台', () => {
-    expect(HARVESTER_PLATFORMS.length).toBe(9);
+  it('注册了 6 个平台', () => {
+    expect(HARVESTER_PLATFORMS.length).toBe(6);
   });
 
   it('包含 zhihu', () => {
@@ -19,20 +19,6 @@ describe('HARVESTER_PLATFORMS 配置', () => {
 
   it('包含 juejin', () => {
     expect(HARVESTER_PLATFORMS.find((p) => p.platform === 'juejin')).toBeDefined();
-  });
-
-  it('包含 bilibili', () => {
-    expect(HARVESTER_PLATFORMS.find((p) => p.platform === 'bilibili')).toBeDefined();
-  });
-
-  it('包含 zhidao', () => {
-    expect(HARVESTER_PLATFORMS.find((p) => p.platform === 'zhidao')).toBeDefined();
-  });
-
-  it('baijia 配置了 harvesterPlatform', () => {
-    const baijia = HARVESTER_PLATFORMS.find((p) => p.platform === 'baijia');
-    expect(baijia).toBeDefined();
-    expect(baijia!.harvesterPlatform).toBe('baijiahao');
   });
 
   it('toutiao 配置了 harvesterPlatform', () => {
@@ -63,14 +49,14 @@ describe('HARVESTER_PLATFORMS 配置', () => {
     expect(csdn!.harvesterPlatform).toBeUndefined();
   });
 
-  it('恰好 4 个平台有自定义 harvesterPlatform', () => {
+  it('恰好 3 个平台有自定义 harvesterPlatform', () => {
     const custom = HARVESTER_PLATFORMS.filter((p) => p.harvesterPlatform !== undefined);
-    expect(custom.length).toBe(4);
+    expect(custom.length).toBe(3);
   });
 
-  it('恰好 5 个平台没有自定义 harvesterPlatform', () => {
+  it('恰好 3 个平台没有自定义 harvesterPlatform', () => {
     const defaults = HARVESTER_PLATFORMS.filter((p) => p.harvesterPlatform === undefined);
-    expect(defaults.length).toBe(5);
+    expect(defaults.length).toBe(3);
   });
 
   it('所有 platform 值唯一', () => {
@@ -81,15 +67,16 @@ describe('HARVESTER_PLATFORMS 配置', () => {
 });
 
 describe('createHarvesterValidators', () => {
-  it('创建 9 个验证器实例', () => {
+  it('创建 6 个验证器实例', () => {
     const validators = createHarvesterValidators();
-    expect(validators.length).toBe(9);
+    expect(validators.length).toBe(6);
   });
 
   it('每个验证器有 platform 属性', () => {
     const validators = createHarvesterValidators();
+    const knownPlatforms = HARVESTER_PLATFORMS.map((p) => p.platform);
     for (const v of validators) {
-      expect(v.platform).toBeTruthy();
+      expect(knownPlatforms).toContain(v.platform);
     }
   });
 
@@ -98,9 +85,9 @@ describe('createHarvesterValidators', () => {
     expect(validators[0].platform).toBe('zhihu');
   });
 
-  it('最后一个验证器是 zhidao', () => {
+  it('最后一个验证器是 netease', () => {
     const validators = createHarvesterValidators();
-    expect(validators[validators.length - 1].platform).toBe('zhidao');
+    expect(validators[validators.length - 1].platform).toBe('netease');
   });
 
   it('每个验证器都有 validate 方法', () => {

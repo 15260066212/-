@@ -111,7 +111,7 @@ export class PlanRepository {
 
   updateScheduledTaskStatus(taskId: string, status: string, extra?: { articleId?: string; runId?: string; errorMessage?: string; executedAt?: string }): void {
     const sets: string[] = ['status = ?'];
-    const params: any[] = [status];
+    const params: (string | number | null)[] = [status];
     if (extra?.articleId) { sets.push('article_id = ?'); params.push(extra.articleId); }
     if (extra?.runId) { sets.push('run_id = ?'); params.push(extra.runId); }
     if (extra?.errorMessage) { sets.push('error_message = ?'); params.push(extra.errorMessage); }

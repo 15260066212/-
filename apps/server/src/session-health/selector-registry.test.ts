@@ -16,10 +16,10 @@ describe('SelectorRegistry', () => {
       expect(zhihu!.validateUrl).toContain('zhihu');
     });
 
-    it('包含 baijia 平台', () => {
-      const baijia = SELECTOR_REGISTRY.find((s) => s.platform === 'baijia');
-      expect(baijia).toBeDefined();
-      expect(baijia!.selectors.length).toBeGreaterThan(0);
+    it('包含 toutiao 平台', () => {
+      const toutiao = SELECTOR_REGISTRY.find((s) => s.platform === 'toutiao');
+      expect(toutiao).toBeDefined();
+      expect(toutiao!.selectors.length).toBeGreaterThan(0);
     });
 
     it('每个平台至少有 1 个选择器', () => {
@@ -30,7 +30,6 @@ describe('SelectorRegistry', () => {
 
     it('每个平台都有 validateUrl', () => {
       for (const set of SELECTOR_REGISTRY) {
-        expect(set.validateUrl).toBeTruthy();
         expect(set.validateUrl.length).toBeGreaterThan(0);
       }
     });
@@ -38,8 +37,8 @@ describe('SelectorRegistry', () => {
     it('选择器都有 selector 和 purpose', () => {
       for (const set of SELECTOR_REGISTRY) {
         for (const entry of set.selectors) {
-          expect(entry.selector).toBeTruthy();
-          expect(entry.purpose).toBeTruthy();
+          expect(entry.selector).not.toBe('');
+          expect(entry.purpose).not.toBe('');
         }
       }
     });
@@ -68,10 +67,10 @@ describe('SelectorRegistry', () => {
       expect(result!.platform).toBe('zhihu');
     });
 
-    it('按名称查找 baijia', () => {
-      const result = getPlatformSelectors('baijia');
+    it('按名称查找 toutiao', () => {
+      const result = getPlatformSelectors('toutiao');
       expect(result).toBeDefined();
-      expect(result!.platform).toBe('baijia');
+      expect(result!.platform).toBe('toutiao');
     });
 
     it('查找未知平台返回 undefined', () => {

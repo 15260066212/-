@@ -61,6 +61,7 @@ export function createMockReview(articleId: string, round = 1): ReviewResult {
       platform_adaptation: { score: 80, issues: [] },
       readability: { score: 95, issues: [] },
       safety: { score: 100, issues: [] },
+      truthfulness: { score: 100, issues: [] },
     },
     issues: [
       { dimension: 'quality', severity: 'low', description: '字数偏少', suggestion: '增加内容' },
@@ -128,4 +129,13 @@ export function createMockPipelineRun(overrides: Partial<PipelineRun> = {}): Pip
 /** Reset the counter (useful for test isolation). */
 export function resetMockCounters(): void {
   articleCounter = 0;
+}
+
+/** Build a RequestInit with a JSON body for Hono's app.request(). */
+export function jsonReq(method: string, body: unknown): RequestInit {
+  return {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  };
 }

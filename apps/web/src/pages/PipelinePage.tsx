@@ -13,13 +13,14 @@ interface Props {
 const REFRESH_INTERVAL_MS = 3000;
 
 export function PipelinePage({ sessionId, sessionData }: Props) {
-  const { status, isRunning, currentRunId, fetchStatus, error, clearError, cancelPipeline } = usePipelineStore();
+  const { status, isRunning, isPaused, currentRunId, fetchStatus, error, clearError, cancelPipeline, pausePipeline, resumePipeline } = usePipelineStore();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetchStatus(sessionId);
   }, [sessionId, fetchStatus]);
 
+  // 暂停/恢复时也要保持状态轮询
   useEffect(() => {
     if (isRunning) {
       timerRef.current = setInterval(() => {
@@ -36,7 +37,7 @@ export function PipelinePage({ sessionId, sessionData }: Props) {
         timerRef.current = null;
       }
     };
-  }, [isRunning, sessionId, fetchStatus]);
+  }, [isRunning, isPaused, sessionId, fetchStatus]);
 
   const showProgress = isRunning || (status?.run != null);
 
@@ -44,6 +45,14 @@ export function PipelinePage({ sessionId, sessionData }: Props) {
     await cancelPipeline(runId);
     // Clear local state so the launcher reappears
     setTimeout(() => fetchStatus(sessionId), 500);
+  };
+
+  const handlePause = async (runId: string) => {
+    await pausePipeline(runId);
+  };
+
+  const handleResume = async (runId: string) => {
+    await resumePipeline(runId);
   };
 
   return (
@@ -72,9 +81,12 @@ export function PipelinePage({ sessionId, sessionData }: Props) {
           <PipelineProgress
             status={status}
             isRunning={isRunning}
+            isPaused={isPaused}
             runId={currentRunId}
             sessionId={sessionId}
             onCancel={handleClosePipeline}
+            onPause={handlePause}
+            onResume={handleResume}
           />
         )}
 

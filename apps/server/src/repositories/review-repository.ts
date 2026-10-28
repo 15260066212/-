@@ -11,9 +11,9 @@ export class ReviewRepository {
         id, article_id, round, passed, overall_score,
         compliance_score, quality_score, seo_score, brand_score,
         originality_score, platform_adaptation_score, readability_score,
-        safety_score, content_hash,
+        safety_score, truthfulness_score, content_hash,
         issues, suggestions, reviewed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       id, review.articleId, review.round, review.passed ? 1 : 0,
@@ -24,6 +24,7 @@ export class ReviewRepository {
       review.dimensions.platform_adaptation?.score ?? 100,
       review.dimensions.readability?.score ?? 100,
       review.dimensions.safety?.score ?? 100,
+      review.dimensions.truthfulness?.score ?? 100,
       review.contentHash ?? null,
       JSON.stringify(review.issues),
       JSON.stringify(review.suggestions), review.reviewedAt
@@ -64,6 +65,7 @@ export class ReviewRepository {
         platform_adaptation: { score: Number(row.platform_adaptation_score ?? 100), issues: filterByDim('platform_adaptation') },
         readability: { score: Number(row.readability_score ?? 100), issues: filterByDim('readability') },
         safety: { score: Number(row.safety_score ?? 100), issues: filterByDim('safety') },
+        truthfulness: { score: Number(row.truthfulness_score ?? 100), issues: filterByDim('truthfulness') },
       },
       issues,
       suggestions: JSON.parse(String(row.suggestions)),
@@ -78,7 +80,7 @@ export class ReviewRepository {
     return this.db.prepare(
       `SELECT overall_score, compliance_score, quality_score, seo_score, brand_score,
               originality_score, platform_adaptation_score, readability_score, safety_score,
-              passed, content_hash
+              truthfulness_score, passed, content_hash
        FROM reviews ORDER BY reviewed_at DESC LIMIT ?`,
     ).all(safeLimit) as Array<Record<string, number>>;
   }

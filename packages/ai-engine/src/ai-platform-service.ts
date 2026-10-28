@@ -12,6 +12,9 @@ const MAX_RETRY_DELAY_MS = 5000;
 /** Minimum output tokens enforced for Doubao Responses API (large-context model). */
 const DOUBAO_MIN_OUTPUT_TOKENS = 16_384;
 
+/** Default max wait timeout for Doubao Flex (low-priority) inference in milliseconds. */
+const DOUBAO_FLEX_DEFAULT_MAX_WAIT_MS = 300_000;
+
 /** Default sampling temperature across all platforms. */
 const DEFAULT_TEMPERATURE = 0.7;
 
@@ -31,9 +34,58 @@ interface PlatformConfig {
   headers: Record<string, string>;
 }
 
+/** Doubao Responses API web search filter configuration. */
+interface DoubaoSearchFilter {
+  time_range?: string;
+  auth_info_level?: number;
+  industry?: string;
+}
+
+/** Doubao Responses API web search tool configuration. */
+interface DoubaoWebSearch {
+  sources: string[];
+  search_filter?: DoubaoSearchFilter;
+  query_rewrite?: boolean;
+}
+
+/** Doubao Responses API request body. */
+interface DoubaoRequestBody {
+  model: string;
+  input: { role: string; content: { type: string; text: string }[] }[];
+  temperature: number;
+  max_output_tokens: number;
+  service_tier?: string;
+  tools?: { type: string; web_search: DoubaoWebSearch }[];
+}
+
+/** Standard chat completion request body (DeepSeek/Qianwen/Kimi/Hunyuan/Default). */
+interface ChatCompletionRequestBody {
+  model: string;
+  messages: { role: string; content: string }[];
+  temperature: number;
+  max_tokens: number;
+  search?: { enabled: boolean; depth: string };
+  enable_search?: boolean;
+  use_search?: boolean;
+  enable_enhancement?: boolean;
+}
+
+/** Union of all platform request body types. */
+type RequestBody = DoubaoRequestBody | ChatCompletionRequestBody;
+
+/** Structured error thrown during HTTP fetch. */
+interface FetchError {
+  code: string;
+  message: string;
+  response?: { status: number; data: string };
+}
+
+/** Raw JSON response from an AI platform API. */
+type PlatformResponse = Record<string, unknown>;
+
 interface QueryResult {
   success: boolean;
-  data?: any;
+  data?: PlatformResponse;
   error?: string;
   platform: string;
   responseTime?: number;
@@ -126,6 +178,76 @@ export class AIPlatformService {
     return Math.min(Math.max(val, 1), 4);
   }
 
+  /**
+   * Whether to enable Query Rewrite for Doubao web search.
+   * Rewrites user queries to improve retrieval relevance.
+   * See: https://www.volcengine.com/docs/87772/2272950 (2025-12 feature)
+   */
+  isDoubaoQueryRewriteEnabled(): boolean {
+    return process.env.DOUBAO_QUERY_REWRITE?.trim().toLowerCase() === 'true';
+  }
+
+  /**
+   * Industry filter for Doubao web search (vertical search scope).
+   * Supports: finance, gaming, government (gov type added 2026-06).
+   * Empty string = no industry filter (search all).
+   * See: https://www.volcengine.com/docs/87772/2272950
+   */
+  getDoubaoSearchIndustry(): string {
+    const val = process.env.DOUBAO_SEARCH_INDUSTRY?.trim().toLowerCase();
+    const valid = ['', 'finance', 'gaming', 'gov'];
+    return valid.includes(val) ? val : '';
+  }
+
+  /**
+   * Whether to enable Doubao Flex (low-priority) inference tier.
+   * Flex uses low-priority resources with independent TPM quota and discounted pricing,
+   * ideal for latency-insensitive batch tasks like periodic monitoring.
+   * See: https://ark.volcengine.com/region:cn-beijing/docs/online-inference-flex
+   * Default: "auto" — enables Flex for monitoring batch queries, disabled for real-time.
+   * Options: "always", "auto", "never"
+   */
+  getDoubaoFlexMode(): 'always' | 'auto' | 'never' {
+    const val = process.env.DOUBAO_FLEX_MODE?.trim().toLowerCase();
+    if (val === 'always' || val === 'never') return val;
+    return 'auto';
+  }
+
+  /**
+   * Max server-side wait timeout for Doubao Flex inference in milliseconds.
+   * Flex requests queue on the server side; this sets the upper bound for waiting.
+   * Default: 300000 (5 minutes). Max allowed: 1200000 (20 minutes).
+   * See: https://ark.volcengine.com/region:cn-beijing/docs/online-inference-flex
+   */
+  getDoubaoFlexMaxWaitMs(): number {
+    const val = parseInt(process.env.DOUBAO_FLEX_MAX_WAIT_MS || '0', 10);
+    if (val <= 0) return DOUBAO_FLEX_DEFAULT_MAX_WAIT_MS;
+    return Math.min(val, 1_200_000);
+  }
+
+  /**
+   * Determine whether to use Flex tier for a given Doubao request.
+   * @param isBatch Whether this is a batch/background query (latency-tolerant).
+   */
+  useDoubaoFlex(isBatch = false): boolean {
+    const mode = this.getDoubaoFlexMode();
+    if (mode === 'never') return false;
+    if (mode === 'always') return true;
+    // auto mode: use Flex for batch queries only
+    return isBatch;
+  }
+
+  /**
+   * Whether to enable Kimi Web Search via the dedicated tools/search API.
+   * Kimi launched Web Search API in Sep 2026 with /v1/tools/search endpoint.
+   * When enabled, Kimi queries use structured search results for better source attribution.
+   * See: https://platform.kimi.ai/docs/platform-changelog
+   * Default: false (uses built-in use_search param for backward compatibility)
+   */
+  isKimiWebSearchApiEnabled(): boolean {
+    return process.env.KIMI_WEB_SEARCH_API_ENABLED?.trim().toLowerCase() === 'true';
+  }
+
   getModelName(platform: string): string {
     const defaults: Record<string, string> = {
       // Doubao Seed 2.1 Pro (2026-09): production-grade reasoning model with 1M context
@@ -153,10 +275,10 @@ export class AIPlatformService {
     return DEFAULT_MAX_TOKENS;
   }
 
-  buildRequestData(platform: string, question: string): any {
+  buildRequestData(platform: string, question: string, opts?: { isBatch?: boolean }): RequestBody {
     switch (platform) {
       case 'doubao':
-        return this.buildDoubaoRequest(question);
+        return this.buildDoubaoRequest(question, opts?.isBatch);
       case 'deepseek':
         return this.buildDeepSeekRequest(platform, question);
       case 'qianwen':
@@ -170,40 +292,38 @@ export class AIPlatformService {
     }
   }
 
-  private buildDoubaoRequest(question: string): any {
-    const body: any = {
+  private buildDoubaoRequest(question: string, isBatch = false): DoubaoRequestBody {
+    const body: DoubaoRequestBody = {
       model: this.getDoubaoResponsesModel(),
       input: [{ role: 'user', content: [{ type: 'input_text', text: question }] }],
       temperature: DEFAULT_TEMPERATURE,
       max_output_tokens: Math.max(this.getMaxTokens('doubao'), DOUBAO_MIN_OUTPUT_TOKENS),
     };
-    // Enable Doubao Web Search (Custom Edition) for GEO monitoring queries
-    // Configures: sources=["doubao"], time_range (freshness), auth_level (credibility filter)
-    // See: https://docs.volcengine.com/docs/82379/1756990
-    //      https://www.volcengine.com/docs/87772/2518319 (authority grading)
+    // Flex low-priority tier: independent TPM quota + discounted pricing
+    // See: https://ark.volcengine.com/region:cn-beijing/docs/online-inference-flex
+    if (this.useDoubaoFlex(isBatch)) {
+      body.service_tier = 'flex';
+    }
     if (this.isDoubaoWebSearchEnabled()) {
-      const webSearch: any = {
-        sources: ['doubao'],
-      };
-      // Freshness control: Doubao weights 1-2 week content highest, drops sharply after 1 month
+      const searchFilter: DoubaoSearchFilter = {};
       const timeRange = this.getDoubaoSearchTimeRange();
-      if (timeRange) {
-        webSearch.search_filter = { time_range: timeRange };
-      }
-      // Authority filter: L1-L2 by default to exclude content farms and SEO spam
+      if (timeRange) searchFilter.time_range = timeRange;
       const authLevel = this.getDoubaoSearchAuthLevel();
-      if (authLevel < 4) {
-        webSearch.search_filter = {
-          ...webSearch.search_filter,
-          auth_info_level: authLevel,
-        };
+      if (authLevel < 4) searchFilter.auth_info_level = authLevel;
+      const webSearch: DoubaoWebSearch = { sources: ['doubao'] };
+      if (Object.keys(searchFilter).length > 0) webSearch.search_filter = searchFilter;
+      if (this.isDoubaoQueryRewriteEnabled()) webSearch.query_rewrite = true;
+      const industry = this.getDoubaoSearchIndustry();
+      if (industry) {
+        if (!webSearch.search_filter) webSearch.search_filter = {};
+        webSearch.search_filter.industry = industry;
       }
       body.tools = [{ type: 'web_search', web_search: webSearch }];
     }
     return body;
   }
 
-  private buildDeepSeekRequest(platform: string, question: string): any {
+  private buildDeepSeekRequest(platform: string, question: string): ChatCompletionRequestBody {
     return {
       model: this.getModelName(platform),
       messages: [{ role: 'user', content: question }],
@@ -213,7 +333,7 @@ export class AIPlatformService {
     };
   }
 
-  private buildQianwenRequest(platform: string, question: string): any {
+  private buildQianwenRequest(platform: string, question: string): ChatCompletionRequestBody {
     return {
       model: this.getModelName(platform),
       messages: [{ role: 'user', content: question }],
@@ -223,7 +343,7 @@ export class AIPlatformService {
     };
   }
 
-  private buildKimiRequest(platform: string, question: string): any {
+  private buildKimiRequest(platform: string, question: string): ChatCompletionRequestBody {
     return {
       model: this.getModelName(platform),
       messages: [{ role: 'user', content: question }],
@@ -233,7 +353,7 @@ export class AIPlatformService {
     };
   }
 
-  private buildHunyuanRequest(platform: string, question: string): any {
+  private buildHunyuanRequest(platform: string, question: string): ChatCompletionRequestBody {
     return {
       model: this.getModelName(platform),
       messages: [{ role: 'user', content: question }],
@@ -243,7 +363,7 @@ export class AIPlatformService {
     };
   }
 
-  private buildDefaultRequest(platform: string, question: string): any {
+  private buildDefaultRequest(platform: string, question: string): ChatCompletionRequestBody {
     return {
       model: this.getModelName(platform),
       messages: [{ role: 'user', content: question }],
@@ -256,22 +376,34 @@ export class AIPlatformService {
     return MAINLAND_MONITORING_PLATFORMS.filter((p) => this.platforms[p]?.apiKey);
   }
 
-  async queryPlatform(platform: string, question: string): Promise<QueryResult> {
+  async queryPlatform(platform: string, question: string, opts?: { isBatch?: boolean }): Promise<QueryResult> {
     const cfg = this.platforms[platform];
     if (!cfg) return { success: false, error: `不支持的AI平台: ${platform}`, platform };
     if (!cfg.apiKey) return { success: false, error: `${cfg.name} API密钥未配置`, platform };
 
-    const requestData = this.buildRequestData(platform, question);
+    const isBatch = opts?.isBatch ?? false;
+    const requestData = this.buildRequestData(platform, question, { isBatch });
     const requestUrl = this.getApiUrl(platform);
-    let lastError: any = null;
+    let lastError: FetchError | null = null;
 
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
       try {
         const startedAt = Date.now();
-        const headers = { ...cfg.headers, Accept: 'application/json' };
+        const headers: Record<string, string> = { ...cfg.headers, Accept: 'application/json' };
+
+        // Doubao Flex: add server-side max wait timeout header
+        // See: https://ark.volcengine.com/region:cn-beijing/docs/online-inference-flex
+        if (platform === 'doubao' && this.useDoubaoFlex(isBatch)) {
+          headers['X-Ark-Max-Wait-Timeout-Ms'] = String(this.getDoubaoFlexMaxWaitMs());
+        }
+
+        // Use Flex-aware timeout (doubao flex needs longer client-side timeout)
+        const clientTimeout = platform === 'doubao' && this.useDoubaoFlex(isBatch)
+          ? Math.max(REQUEST_TIMEOUT_MS, this.getDoubaoFlexMaxWaitMs() + 30_000)
+          : REQUEST_TIMEOUT_MS;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const timeoutId = setTimeout(() => controller.abort(), clientTimeout);
         const response = await fetch(requestUrl, {
           method: 'POST',
           headers,
@@ -283,30 +415,40 @@ export class AIPlatformService {
         const responseTime = Math.max(0, Date.now() - startedAt);
         if (!response.ok) {
           const errText = await response.text().catch(() => '');
-          throw { code: `HTTP_${response.status}`, message: `HTTP ${response.status}`, response: { status: response.status, data: errText } };
+          const fetchError: FetchError = {
+            code: `HTTP_${response.status}`,
+            message: `HTTP ${response.status}`,
+            response: { status: response.status, data: errText },
+          };
+          throw fetchError;
         }
-        const data = await response.json();
+        const data = await response.json() as PlatformResponse;
         return { success: true, data, platform, responseTime };
-      } catch (error: any) {
-        lastError = error;
-        const code = error.code || '';
-        const status = error.response?.status;
-        const retryable = code === 'ECONNABORTED' || code === 'ENOTFOUND' || code === 'ECONNRESET' || status === 429 || (status && status >= 500);
+      } catch (error: unknown) {
+        const fetchError = error as FetchError;
+        lastError = fetchError;
+        const code = fetchError.code || '';
+        const status = fetchError.response?.status;
+        const retryable = code === 'ECONNABORTED' || code === 'ENOTFOUND' || code === 'ECONNRESET' || status === 429 || (status !== undefined && status >= 500);
         if (attempt < MAX_RETRY_ATTEMPTS && retryable) {
           const baseDelay = Math.min(MAX_RETRY_DELAY_MS, BASE_RETRY_DELAY_MS * Math.pow(2, attempt));
           const jitter = Math.floor(Math.random() * RETRY_JITTER_MAX_MS);
           await new Promise((r) => setTimeout(r, baseDelay + jitter));
           continue;
         }
-        return { success: false, error: `[${platform}] ${code} ${error.message}${status ? ` (status ${status})` : ''}`, platform };
+        return { success: false, error: `[${platform}] ${code} ${fetchError.message}${status ? ` (status ${status})` : ''}`, platform };
       }
     }
     return { success: false, error: lastError?.message || '未知错误', platform };
   }
 
-  async queryMultiplePlatforms(platforms: string[], question: string): Promise<QueryResult[]> {
-    const results = await Promise.allSettled(platforms.map((p) => this.queryPlatform(p, question)));
-    return results.map((r, i) => (r.status === 'fulfilled' ? r.value : { success: false, error: r.reason?.message, platform: platforms[i] }));
+  async queryMultiplePlatforms(platforms: string[], question: string, opts?: { isBatch?: boolean }): Promise<QueryResult[]> {
+    const results = await Promise.allSettled(platforms.map((p) => this.queryPlatform(p, question, opts)));
+    return results.map((r, i) => {
+      if (r.status === 'fulfilled') return r.value;
+      const reason = r.reason as FetchError;
+      return { success: false, error: reason?.message || String(r.reason), platform: platforms[i] };
+    });
   }
 }
 

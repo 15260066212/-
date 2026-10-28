@@ -10,7 +10,7 @@ describe('WechatValidator', () => {
 
   describe('platform 属性', () => {
     it('platform 为 weixin', () => {
-      expect(validator.platform).toBe('weixin');
+      expect(validator.platform).toBe('weixin', 'should have correct platform when platform 为 weixin');
     });
   });
 
@@ -22,8 +22,8 @@ describe('WechatValidator', () => {
         data: {},
       } as any);
 
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe('Missing appId or appSecret');
+      expect(result.valid).toBe(false, 'should have correct valid flag when 缺少 appId 和 appSecret 时返回 invalid');
+      expect(result.error).toBe('Missing appId or appSecret', 'should have correct error field when 缺少 appId 和 appSecret 时返回 invalid');
     });
 
     it('缺少 appSecret 时返回 invalid', async () => {
@@ -33,8 +33,8 @@ describe('WechatValidator', () => {
         data: { appId: 'wx123' },
       } as any);
 
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe('Missing appId or appSecret');
+      expect(result.valid).toBe(false, 'should have correct valid flag when 缺少 appSecret 时返回 invalid');
+      expect(result.error).toBe('Missing appId or appSecret', 'should have correct error field when 缺少 appSecret 时返回 invalid');
     });
 
     it('缺少 appId 时返回 invalid', async () => {
@@ -44,8 +44,8 @@ describe('WechatValidator', () => {
         data: { appSecret: 'secret123' },
       } as any);
 
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe('Missing appId or appSecret');
+      expect(result.valid).toBe(false, 'should have correct valid flag when 缺少 appId 时返回 invalid');
+      expect(result.error).toBe('Missing appId or appSecret', 'should have correct error field when 缺少 appId 时返回 invalid');
     });
 
     it('支持 app_id 和 app_secret 命名（snake_case）', async () => {
@@ -82,10 +82,10 @@ describe('WechatValidator', () => {
         data: { appId: 'wx123', appSecret: 'secret123' },
       } as any);
 
-      expect(result.valid).toBe(true);
-      expect(result.error).toBeUndefined();
-      expect(result.evidence?.pageTitle).toBe('WeChat API token');
-      expect(result.durationMs).toBeGreaterThanOrEqual(0);
+      expect(result.valid).toBe(true, 'should have correct valid flag when 返回 access_token 时标记为 valid');
+      expect(result.error).toBeUndefined('should be undefined when 返回 access_token 时标记为 valid');
+      expect(result.evidence?.pageTitle).toBe('WeChat API token', 'should have correct pageTitle when 返回 access_token 时标记为 valid');
+      expect(result.durationMs).toBeGreaterThanOrEqual(0, 'should be greater than or equal for 返回 access_token 时标记为 valid');
     });
   });
 
@@ -101,9 +101,9 @@ describe('WechatValidator', () => {
         data: { appId: 'bad', appSecret: 'secret' },
       } as any);
 
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('40013');
-      expect(result.error).toContain('AppID');
+      expect(result.valid).toBe(false, 'should have correct valid flag when errcode 40013 映射为无效 AppID');
+      expect(result.error).toContain('40013', 'should contain expected value in error field for errcode 40013 映射为无效 AppID');
+      expect(result.error).toContain('AppID', 'should contain expected value in error field for errcode 40013 映射为无效 AppID');
     });
 
     it('errcode 40125 映射为无效 AppSecret', async () => {
@@ -117,7 +117,7 @@ describe('WechatValidator', () => {
         data: { appId: 'wx123', appSecret: 'bad' },
       } as any);
 
-      expect(result.valid).toBe(false);
+      expect(result.valid).toBe(false, 'should have correct valid flag when errcode 40125 映射为无效 AppSecret');
       expect(result.error).toContain('40125');
       expect(result.error).toContain('AppSecret');
     });

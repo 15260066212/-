@@ -8,22 +8,30 @@ import {
   X,
   Target,
   Radar,
+  ShieldCheck,
+  Server,
+  BookOpen,
 } from 'lucide-react';
+import { useAuthStore } from '../../stores/authStore.js';
 
-export type NavKey = 'chat' | 'plan' | 'content' | 'pipeline' | 'accounts' | 'monitor' | 'competitor';
+export type NavKey = 'chat' | 'plan' | 'content' | 'ek' | 'pipeline' | 'accounts' | 'profiles' | 'nodes' | 'monitor' | 'competitor';
 
 interface NavItem {
   key: NavKey;
   label: string;
   icon: typeof MessageCircle;
+  adminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'chat', label: 'GEO 配置', icon: MessageCircle },
   { key: 'plan', label: '优化方案', icon: Target },
   { key: 'content', label: '内容管理', icon: FolderOpen },
+  { key: 'ek', label: '芯图EK', icon: BookOpen },
   { key: 'pipeline', label: '流水线', icon: Send },
   { key: 'accounts', label: '账号管理', icon: Key },
+  { key: 'profiles', label: 'Profile 管理', icon: ShieldCheck },
+  { key: 'nodes', label: '节点管理', icon: Server, adminOnly: true },
   { key: 'competitor', label: '竞品监测', icon: Radar },
   { key: 'monitor', label: '运营监控', icon: BarChart3 },
 ];
@@ -37,6 +45,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeKey, onNavigate, isOpen = true, onClose, enterpriseName }: SidebarProps) {
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin';
+  const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
   return (
     <>
       {/* Mobile overlay */}
@@ -76,7 +87,7 @@ export function Sidebar({ activeKey, onNavigate, isOpen = true, onClose, enterpr
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
+          {visibleItems.map((item) => {
             const isActive = activeKey === item.key;
             const Icon = item.icon;
             return (

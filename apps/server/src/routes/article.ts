@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import { ContentGenerator } from '@zemingengine/content-generator';
 import { ContentReviewer } from '@zemingengine/content-reviewer';
+import { selectCitedSources, recordSourceUsage } from '@zemingengine/dialogue-engine';
 import type { Article, ArticleStatus, GenerateArticleRequest } from '@zemingengine/shared';
 import type { DatabaseAccess } from '../db.js';
 import { appendContactFooter } from '../article-footer.js';
+import { updateSession } from '../session-store.js';
 
 export function createArticleRoutes(db: DatabaseAccess): Hono {
   const app = new Hono();
@@ -20,6 +22,35 @@ export function createArticleRoutes(db: DatabaseAccess): Hono {
         return c.json({ success: false, error: 'Session not found' }, 404);
       }
 
+      // 三层检索：L3 AI 名片必引 → L2 候选池（Milvus 语义召回 + 编译式配额 + usageCount 差额均衡），合计 6-9 条
+      let milvusCandidateIds: string[] | undefined;
+      if (db.milvus?.isEnabled()) {
+        try {
+          const queryText = [
+            (body as { topic?: string }).topic,
+            body.contentType,
+            body.platform,
+            session.enterprise.products.map((p) => p.name).join('、'),
+          ].filter(Boolean).join(' ');
+          const hits = await db.milvus.semanticSearch(
+            session.enterprise.shortName || session.enterprise.fullName || body.sessionId,
+            queryText,
+            20,
+          );
+          milvusCandidateIds = hits.map((h) => h.sourceId);
+          console.log(`[Article] Milvus 语义召回 ${hits.length} 条`);
+        } catch (e) {
+          console.warn('[Article] Milvus 语义召回失败，回退纯编译式:', e instanceof Error ? e.message : e);
+        }
+      }
+
+      const selection = selectCitedSources(session, {
+        topic: (body as { topic?: string }).topic,
+        platform: body.platform,
+        contentType: body.contentType,
+      }, { milvusCandidateIds });
+      const citedSources = selection?.selected ?? [];
+
       const MAX_REGEN_ROUNDS = 3;
       let currentRound = 1;
       let result = await generator.generate(
@@ -28,12 +59,15 @@ export function createArticleRoutes(db: DatabaseAccess): Hono {
           platform: body.platform,
           contentType: body.contentType,
           generationRound: currentRound,
+          citedSources,
         },
         session,
       );
 
       // Append enterprise contact info to article footer
       result.article = appendContactFooter(result.article, session.enterprise);
+      // 芯图EK · 记录本文实际引用的信源集合（L3 名片在前），用于组合引用统计
+      result.article.citedSourceIds = citedSources.map((source) => source.id);
       db.articles.insertArticle(result.article);
 
       // Auto-review and regenerate if not passed (up to 3 rounds)
@@ -55,12 +89,14 @@ export function createArticleRoutes(db: DatabaseAccess): Hono {
               suggestions: review.suggestions,
               overallScore: review.overallScore,
             },
+            citedSources,
           },
           session,
         );
 
         // Append enterprise contact info to regenerated article too
         regenResult.article = appendContactFooter(regenResult.article, session.enterprise);
+        regenResult.article.citedSourceIds = citedSources.map((source) => source.id);
         db.articles.insertArticle(regenResult.article);
         review = reviewer.review(regenResult.article, session);
         db.reviews.insertReview(review);
@@ -74,6 +110,14 @@ export function createArticleRoutes(db: DatabaseAccess): Hono {
 
       if (review.passed) {
         db.articles.updateArticle(result.article.id, { status: 'approved' });
+        // 生成成功后回写引用计数（失败或未通过不计入，避免引用分布失真）
+        if (citedSources.length > 0) {
+          updateSession(
+            body.sessionId,
+            recordSourceUsage(session, citedSources.map((source) => source.id)),
+            db,
+          );
+        }
       }
 
       return c.json({

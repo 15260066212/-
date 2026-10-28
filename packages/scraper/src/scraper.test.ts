@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { scrapeUrl } from './scraper.js';
 
 describe('scrapeUrl', () => {
-  it('should be a function', () => {
+  // Smoke test: verifies the function is exported and callable.
+  // Full integration tests require network access and are skipped by default (see below).
+  it('should be exported as a function', () => {
     expect(typeof scrapeUrl).toBe('function');
   });
 

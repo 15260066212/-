@@ -29,6 +29,27 @@ export interface OptimizationPlan {
   totalArticles: number;
 }
 
+// Schema.org JSON-LD types (local use only)
+interface SchemaPostalAddress {
+  '@type': 'PostalAddress';
+  addressLocality: string;
+  addressRegion: string;
+  addressCountry: string;
+}
+
+interface SchemaOrganization {
+  '@context': string;
+  '@type': string;
+  name: string;
+  alternateName: string;
+  description: string;
+  address: SchemaPostalAddress;
+  knowsAbout: string[];
+  areaServed: string;
+  url?: string;
+  employeeCount?: string;
+}
+
 const ALL_CONTENT_TYPES: { id: ArticleContentType; label: string; desc: string }[] = [
   { id: 'tutorial', label: '教程', desc: '操作指南、步骤详解，建立专业权威' },
   { id: 'case', label: '案例', desc: '客户成功案例，增强信任背书' },
@@ -446,7 +467,7 @@ function generateSchemaJsonLd(enterprise: EnterpriseProfile): string {
   const products = enterprise.products?.map((p) => p.name) || [];
   const knowsAbout = products.length > 0 ? products : [industry];
 
-  const schema: any = {
+  const schema: SchemaOrganization = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name,

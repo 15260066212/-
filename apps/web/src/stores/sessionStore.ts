@@ -18,6 +18,7 @@ interface SessionStore {
   sendMessage: (text: string) => Promise<void>;
   submitUrl: (url: string) => Promise<void>;
   importPpt: (file: File) => Promise<void>;
+  importDocx: (file: File) => Promise<void>;
   confirmProfileReview: (payload: ProfileReviewRequest) => Promise<void>;
   goBack: () => Promise<void>;
   clearError: () => void;
@@ -106,6 +107,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
     await withLoading(set, 'isLoading', 'error', 'PPT 导入失败', async () => {
       const result = await api.importPpt(sessionId, file);
+      set({
+        sessionData: result.sessionData as SessionData,
+      });
+    });
+  },
+
+  importDocx: async (file: File) => {
+    const { sessionId } = get();
+    if (!sessionId) return;
+
+    await withLoading(set, 'isLoading', 'error', 'Word 文档导入失败', async () => {
+      const result = await api.importDocx(sessionId, file);
       set({
         sessionData: result.sessionData as SessionData,
       });

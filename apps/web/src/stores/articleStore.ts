@@ -28,7 +28,12 @@ interface ArticleStore {
   fetchReviews: (articleId: string) => Promise<void>;
   reviewArticle: (articleId: string) => Promise<ReviewResult>;
   publishArticle: (articleId: string) => Promise<PublishTask[]>;
+  waitForDraftSave: (
+    articleId: string,
+    timeoutMs?: number,
+  ) => Promise<{ ok: boolean; error?: string; tasks: PublishTask[] }>;
   retryPublish: (taskId: string) => Promise<PublishTask>;
+  confirmPublished: (articleId: string, postUrl?: string) => Promise<void>;
   deleteArticle: (id: string) => Promise<void>;
   clearError: () => void;
 }
@@ -129,9 +134,10 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   },
 
   publishArticle: async (articleId: string) => {
-    return withLoading(set, 'actionLoading', 'error', '发布文章失败', async () => {
+    return withLoading(set, 'actionLoading', 'error', '提交草稿箱失败', async () => {
       const tasks = await api.publishArticle(articleId);
-      // 发布后文章状态变为 publishing，同步更新列表
+      // 草稿优先模式：POST 只是提交任务，平台侧草稿尚未落盘，
+      // 因此这里只标记为 publishing，等 waitForDraftSave 轮询到真实结果再改状态
       const { articles } = get();
       set({
         articles: articles.map((a) =>
@@ -142,11 +148,72 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     }, true) as Promise<PublishTask[]>;
   },
 
+  waitForDraftSave: async (articleId: string, timeoutMs = 240000) => {
+    const startedAt = Date.now();
+    let tasks: PublishTask[] = [];
+    while (Date.now() - startedAt < timeoutMs) {
+      tasks = await api.fetchPublishTasks(articleId);
+      const saved = tasks.find(
+        (t) => t.status === 'draft_saved' || t.status === 'published',
+      );
+      if (saved) {
+        const { articles } = get();
+        set({
+          articles: articles.map((a) =>
+            a.id === articleId ? { ...a, status: 'draft_saved' } : a,
+          ),
+        });
+        return { ok: true, tasks };
+      }
+      const failed = tasks.find((t) => t.status === 'failed');
+      if (failed) {
+        const { articles } = get();
+        set({
+          articles: articles.map((a) =>
+            a.id === articleId ? { ...a, status: 'failed' } : a,
+          ),
+        });
+        return {
+          ok: false,
+          error: failed.errorMessage ?? '平台未保存草稿，请重试',
+          tasks,
+        };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+    return {
+      ok: false,
+      error: '仍在处理中（超过等待时间），请稍后在「发布记录」查看最终结果',
+      tasks,
+    };
+  },
+
   retryPublish: async (taskId: string) => {
-    return withLoading(set, 'actionLoading', 'error', '重试发布失败', async () => {
+    return withLoading(set, 'actionLoading', 'error', '重试保存草稿失败', async () => {
       const task = await api.retryPublish(taskId);
       return task;
     }, true) as Promise<PublishTask>;
+  },
+
+  // 使用者在平台手动发布后，回到系统标记文章为已发布
+  confirmPublished: async (articleId: string, postUrl?: string) => {
+    return withLoading(set, 'actionLoading', 'error', '标记已发布失败', async () => {
+      // 先获取该文章的发布任务，找到 draft_saved 状态的任务
+      const tasks = await api.fetchPublishTasks(articleId);
+      const draftTask = tasks.find((t) => t.status === 'draft_saved') || tasks[0];
+      if (!draftTask) {
+        throw new Error('未找到该文章的发布任务');
+      }
+      await api.confirmPublished(draftTask.id, postUrl);
+      const { articles } = get();
+      set({
+        articles: articles.map((a) =>
+          a.id === articleId
+            ? { ...a, status: 'published' as const, ...(postUrl ? { publishUrl: postUrl } : {}) }
+            : a,
+        ),
+      });
+    }, true) as Promise<void>;
   },
 
   deleteArticle: async (id: string) => {

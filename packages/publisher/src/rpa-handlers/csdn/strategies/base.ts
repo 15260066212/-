@@ -79,12 +79,16 @@ export abstract class BaseCsdnStrategy implements CsdnPublishStrategy {
           };
         }
 
-        // Success with no URL — still consider it published (draft was saved at minimum)
-        // Return success with a note; caller can decide to verify further
+        // API returned success but no article URL/ID — this means the article
+        // was likely saved as a DRAFT, not actually published.
+        // Return as draft_saved so the caller can distinguish from real publication.
+        console.warn('[CSDN RPA] API returned success but no article URL — likely saved as draft only');
         return {
-          success: true,
-          verificationStatus: 'api_confirmed',
-          verificationMessage: `CSDN saveArticle API returned success (code=${data.code}, msg="${data.msg || data.data}"). Article URL not yet available — may be in review.`,
+          success: false,
+          draftSaved: true,
+          verificationStatus: 'draft_saved',
+          verificationMessage: `CSDN saveArticle API returned success (code=${data.code}, msg="${data.msg || data.data}") but no article URL was returned. The article was likely saved as a draft, not published.`,
+          error: 'Article saved as draft only, not published. No article URL returned by API.',
         };
       }
 
@@ -120,11 +124,29 @@ export abstract class BaseCsdnStrategy implements CsdnPublishStrategy {
   }
 
   // ===========================================================================
+  // Helper: Check if a saveArticle response body contains a real article URL
+  // ===========================================================================
+
+  protected responseHasArticleUrl(body: string): boolean {
+    try {
+      const data = JSON.parse(body);
+      if (data.data && typeof data.data === 'object') {
+        const url = data.data.url || data.data.article_url || '';
+        return url.includes('/article/details/') || url.includes('blog.csdn.net');
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  // ===========================================================================
   // Helper: Click the "发布文章" publish button
   // ===========================================================================
 
   protected async clickPublishButton(page: Page): Promise<boolean> {
     const publishSelectors = [
+      // New editor (editor.csdn.net/md/) - primary publish button
       'button:has-text("发布文章")',
       'button:has-text("发布")',
       'a:has-text("发布文章")',
@@ -134,6 +156,20 @@ export abstract class BaseCsdnStrategy implements CsdnPublishStrategy {
       '.toolbar-item:has-text("发布文章")',
       'button:has-text("发表文章")',
       'button:has-text("发表")',
+      // New CSDN editor - sidebar / top bar publish buttons
+      '.editor-header button:has-text("发布")',
+      '.toolbar-right button:has-text("发布")',
+      '.publish-bar button:has-text("发布")',
+      '.article-bar button:has-text("发布")',
+      'div[class*="publish"] button:has-text("发布")',
+      'div[class*="Publish"] button:has-text("发布")',
+      // Icon + text buttons
+      'button:has(span:has-text("发布"))',
+      '.el-button--primary:has-text("发布")',
+      '.ant-btn-primary:has-text("发布")',
+      // Fallback: primary-colored button with publish icon
+      'button.primary-btn',
+      '.editor-footer .btn-primary',
     ];
 
     for (const sel of publishSelectors) {
@@ -147,6 +183,42 @@ export abstract class BaseCsdnStrategy implements CsdnPublishStrategy {
       } catch {
         // try next
       }
+    }
+
+    // Last resort: find any clickable element with "发布" text near top/right of page
+    try {
+      const clicked = await page.evaluate(() => {
+        const candidates = Array.from(document.querySelectorAll('button, a, div[role="button"], span'));
+        for (const el of candidates) {
+          const text = (el.textContent || '').trim();
+          if ((text === '发布文章' || text === '发布') && el.getBoundingClientRect().width > 30) {
+            const rect = el.getBoundingClientRect();
+            // Prefer buttons in the top-right area (publish buttons are usually there)
+            if (rect.top < window.innerHeight * 0.4 && rect.left > window.innerWidth * 0.5) {
+              (el as HTMLElement).click();
+              return true;
+            }
+          }
+        }
+        // If no top-right match, try any visible publish button
+        for (const el of candidates) {
+          const text = (el.textContent || '').trim();
+          if (text === '发布文章' || text === '发布') {
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 30 && rect.height > 20) {
+              (el as HTMLElement).click();
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+      if (clicked) {
+        console.log('[CSDN RPA] Publish button clicked via DOM fallback search');
+        return true;
+      }
+    } catch {
+      // continue
     }
 
     return false;

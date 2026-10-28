@@ -3,20 +3,23 @@ import type { PublishResult, FailureAnalysis } from './types.js';
 import { classifyFailure } from './types.js';
 import { PublishDefaults } from './constants.js';
 import { PlatformAdapter } from './adapters/base.js';
-import { WechatAdapter } from './adapters/index.js';
+import { WechatAdapter, WechatSyncCoreAdapter } from './adapters/index.js';
+import { ToutiaoApiAdapter } from './adapters/toutiao-api.js';
+import { exportCookiesFromChrome } from './cookie-exporter.js';
 import { RPAEngine } from './rpa-engine.js';
 import { RpaHandler } from './rpa-handlers/base.js';
 import {
   CsdnRpaHandler,
   ZhihuRpaHandler,
   JuejinRpaHandler,
-  BaijiaRpaHandler,
   ToutiaoRpaHandler,
-  BilibiliRpaHandler,
   SohuRpaHandler,
   NeteaseRpaHandler,
-  BaiduZhidaoRpaHandler,
 } from './rpa-handlers/index.js';
+// 注意：NeteaseApiAdapter 已存在但**故意不注册**——它是占位骨架，
+// publish 需要抓包补全。注册会抢占 NeteaseRpaHandler 的 RPA fallback。
+// 抓包完成后，把下面注释取消即可：
+// import { NeteaseApiAdapter } from './adapters/netease-api.js';
 
 /** Callback for writing publish log entries to DB or elsewhere. */
 export type LogCallback = (entry: {
@@ -54,16 +57,30 @@ export class Publisher {
     // === API-based platforms ===
     pub.registerAdapter(new WechatAdapter());
 
+    // === WechatSync Core API-based platforms (纯 Node.js fetch + Cookie，零 Chromium) ===
+    // Cookie 通过 exportCookiesFromChrome 从 harvester 的 Chrome profile 导出
+    // 优先级高于 RPA handler（publishArticle 里 getMethod() === 'api' 走 adapter）
+    const coreCookiesProvider = exportCookiesFromChrome;
+    pub.registerAdapter(new WechatSyncCoreAdapter('csdn',    { cookiesProvider: coreCookiesProvider, debug: true }));
+    pub.registerAdapter(new WechatSyncCoreAdapter('juejin',  { cookiesProvider: coreCookiesProvider, debug: true }));
+    pub.registerAdapter(new WechatSyncCoreAdapter('zhihu',   { cookiesProvider: coreCookiesProvider, debug: true }));
+    pub.registerAdapter(new WechatSyncCoreAdapter('sohu',    { cookiesProvider: coreCookiesProvider, debug: true }));
+    // 头条：独立 API 适配器（来源: wechatsync git 历史 + v1 driver）
+    // 默认存草稿（save=1）。若返回 err_no=7050（缺 msToken/a_bogus 签名），退回 RPA。
+    pub.registerAdapter(new ToutiaoApiAdapter({ cookiesProvider: coreCookiesProvider, debug: true }));
+    // 注意：NeteaseApiAdapter 故意不注册——它是占位骨架（publish 未抓包补全）。
+    // netease 继续走 NeteaseRpaHandler。抓包完成后取消下面注释：
+    // pub.registerAdapter(new NeteaseApiAdapter({ cookiesProvider: coreCookiesProvider, debug: true }));
+
     // === RPA-based platforms ===
+    // 注意：CSDN/掘金/知乎 虽然也注册了 RPA handler，但 WechatSyncCoreAdapter (API) 优先。
+    // RPA handler 仅在 WechatSyncCoreAdapter 不可用时（如 dist 加载失败）作为 fallback。
     pub.registerRpaHandler(new CsdnRpaHandler());
     pub.registerRpaHandler(new ZhihuRpaHandler());
     pub.registerRpaHandler(new JuejinRpaHandler());
-    pub.registerRpaHandler(new BaijiaRpaHandler());
     pub.registerRpaHandler(new ToutiaoRpaHandler());
-    pub.registerRpaHandler(new BilibiliRpaHandler());
     pub.registerRpaHandler(new SohuRpaHandler());
     pub.registerRpaHandler(new NeteaseRpaHandler());
-    pub.registerRpaHandler(new BaiduZhidaoRpaHandler());
 
     return pub;
   }
@@ -153,16 +170,41 @@ export class Publisher {
   async publishArticle(
     article: Article,
     credentials: PlatformCredentials,
-    platform?: string,
+    platform?: PlatformId,
   ): Promise<PublishResult> {
-    const targetPlatform = platform || article.platform;
+    const targetPlatform = platform || article.platform as PlatformId;
     const adapter = this.adapters.get(targetPlatform);
     // Only use adapter directly for API-based platforms
     if (adapter && adapter.getMethod() === 'api') {
       return adapter.publish({ article, credentials });
     }
     // For RPA platforms, delegate to the RPAEngine
-    return this.rpaEngine.publish(targetPlatform, article, credentials);
+    const accountId = credentials.accountId || 'default';
+    return this.rpaEngine.publish(article, credentials, accountId);
+  }
+
+  /**
+   * Save an article as a draft on the platform without publishing it.
+   *
+   * - API platforms (weixin): call adapter.saveDraft() (draft/add API)
+   * - RPA platforms: delegate to RPAEngine.saveDraft() (fills editor + clicks
+   *   save-draft button)
+   *
+   * Returns a PublishResult with `verificationStatus: 'draft_saved'` and
+   * `draftSaved: true` on success.
+   */
+  async saveDraftArticle(
+    article: Article,
+    credentials: PlatformCredentials,
+    platform?: PlatformId,
+  ): Promise<PublishResult> {
+    const targetPlatform = platform || article.platform as PlatformId;
+    const adapter = this.adapters.get(targetPlatform);
+    if (adapter && adapter.getMethod() === 'api') {
+      return adapter.saveDraft({ article, credentials });
+    }
+    const accountId = credentials.accountId || 'default';
+    return this.rpaEngine.saveDraft(article, credentials, accountId);
   }
 
   /**
@@ -223,6 +265,95 @@ export class Publisher {
         lastResult = { success: false, error: errorMsg };
         lastAnalysis = classifyFailure(errorMsg);
         this.log(task.id, 'error', `Publish attempt ${attempt} threw error`, {
+          error: errorMsg,
+          failureType: lastAnalysis.type,
+          failureCategory: lastAnalysis.category,
+          retryable: lastAnalysis.retryable,
+        });
+      }
+
+      if (attempt < maxAttempts && lastAnalysis) {
+        if (!lastAnalysis.retryable) {
+          this.log(task.id, 'warn', `Skipping retry: ${lastAnalysis.category} is not retryable`, {
+            failureType: lastAnalysis.type,
+          });
+          break;
+        }
+
+        const delay = lastAnalysis.retryDelayMs * attempt;
+        this.log(task.id, 'info', `Waiting ${delay}ms before retry ${attempt + 1}`, {
+          delayMs: delay,
+          failureType: lastAnalysis.type,
+        });
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    if (lastAnalysis) {
+      onTaskUpdate?.({
+        errorMessage: `[${lastAnalysis.category}] ${lastResult.error ?? ''}`.slice(0, 500),
+      });
+    }
+
+    return lastResult;
+  }
+
+  /**
+   * Save article as draft with intelligent retry based on failure classification.
+   *
+   * Mirrors publishWithRetry but calls saveDraftArticle() instead of
+   * publishArticle(). On success the result will have draftSaved=true and
+   * verificationStatus='draft_saved'.
+   *
+   * Uses the same failure-aware retry strategy as publishWithRetry.
+   */
+  async saveDraftWithRetry(
+    task: PublishTask,
+    article: Article,
+    credentials: PlatformCredentials,
+    onTaskUpdate?: (updates: Partial<PublishTask>) => void,
+  ): Promise<PublishResult> {
+    const maxAttempts = task.maxRetries + 1;
+    let lastResult: PublishResult = { success: false, error: 'No attempts made' };
+    let lastAnalysis: FailureAnalysis | null = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const isRetry = attempt > 1;
+      this.log(task.id, 'info', `Draft-save attempt ${attempt}/${maxAttempts} for ${task.platform}`, {
+        articleId: article.id,
+        attempt,
+        isRetry,
+        ...(isRetry && lastAnalysis ? { failureType: lastAnalysis.type, failureCategory: lastAnalysis.category } : {}),
+      });
+
+      if (isRetry && onTaskUpdate) {
+        onTaskUpdate({ status: 'retrying', retryCount: attempt - 1 });
+      }
+
+      try {
+        const result = await this.saveDraftArticle(article, credentials, task.platform);
+        lastResult = result;
+
+        if (result.success) {
+          this.log(task.id, 'info', `Draft-save succeeded on attempt ${attempt}`, {
+            postId: result.postId,
+            draftSaved: result.draftSaved,
+          });
+          return result;
+        }
+
+        lastAnalysis = classifyFailure(result.error ?? 'Unknown error');
+        this.log(task.id, 'warn', `Draft-save attempt ${attempt} failed`, {
+          error: result.error,
+          failureType: lastAnalysis.type,
+          failureCategory: lastAnalysis.category,
+          retryable: lastAnalysis.retryable,
+        });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        lastResult = { success: false, error: errorMsg };
+        lastAnalysis = classifyFailure(errorMsg);
+        this.log(task.id, 'error', `Draft-save attempt ${attempt} threw error`, {
           error: errorMsg,
           failureType: lastAnalysis.type,
           failureCategory: lastAnalysis.category,

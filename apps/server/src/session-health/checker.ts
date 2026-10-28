@@ -12,6 +12,11 @@ import {
   type HealthCheckStatus,
 } from './types.js';
 
+interface ValidationOutcome {
+  status: HealthCheckStatus;
+  errorMessage?: string;
+}
+
 export class SessionHealthChecker {
   private db: DatabaseAccess;
   private validators: Map<PlatformId, BaseValidator> = new Map();
@@ -40,7 +45,6 @@ export class SessionHealthChecker {
   }
 
   registerValidator(validator: BaseValidator): void {
-    // Inject database access for validators that support cookie refresh
     if ('setDatabase' in validator && typeof (validator as { setDatabase: (db: DatabaseAccess) => void }).setDatabase === 'function') {
       (validator as HarvesterBrowserValidator).setDatabase(this.db);
     }
@@ -88,7 +92,6 @@ export class SessionHealthChecker {
       await Promise.all(promises);
       checkedCount = toCheck.length;
 
-      // Send pending alerts after batch completes
       await this.alerter.sendPendingAlerts().catch((err) => {
         console.error('[HealthChecker] Failed to send alerts:', err instanceof Error ? err.message : err);
       });
@@ -97,6 +100,99 @@ export class SessionHealthChecker {
     }
 
     return checkedCount;
+  }
+
+  /** Run the validator and capture the outcome, catching any thrown errors. */
+  private async executeValidation(credentials: PlatformCredentials, userId: string): Promise<ValidationOutcome> {
+    this.db.credentials.recordHealthCheck(credentials.platform, 'checking', 0, undefined, userId);
+
+    try {
+      const validator = this.validators.get(credentials.platform as PlatformId)!;
+      const result = await validator.validate(credentials);
+      if (result.valid) {
+        return { status: 'valid' };
+      }
+      return { status: 'error', errorMessage: result.error || 'Validation failed' };
+    } catch (err) {
+      return { status: 'error', errorMessage: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  /** Record a valid result and create a recovery alert if the credential was previously expired. */
+  private handleValidResult(credentials: PlatformCredentials, userId: string, wasExpired: boolean): void {
+    this.db.credentials.recordHealthCheck(credentials.platform, 'valid', 0, undefined, userId);
+
+    if (wasExpired) {
+      this.alerter.createAlert({
+        platform: credentials.platform,
+        alertType: 'session_recovered',
+        message: `登录态已恢复正常`,
+        userId,
+      });
+      console.log(`[HealthChecker] ${credentials.platform}: recovered from expired`);
+    }
+  }
+
+  /** Fire-and-forget auto-relogin for supported platforms. */
+  private maybeTriggerRelogin(platform: string, userId: string): void {
+    if (!this.reloginManager?.isPlatformSupported(platform)) return;
+
+    if (!this.reloginManager.canAttempt(platform)) {
+      console.log(`[HealthChecker] Relogin for ${platform} is in cooldown or rate-limited`);
+      return;
+    }
+
+    console.log(`[HealthChecker] Triggering auto-relogin for ${platform}`);
+    void this.reloginManager.attemptRelogin(platform, userId)
+      .then((result) => {
+        if (result.success) {
+          console.log(`[HealthChecker] Auto-relogin succeeded for ${platform}`);
+        } else {
+          console.warn(`[HealthChecker] Auto-relogin failed for ${platform}: ${result.errorType} - ${result.errorMessage}`);
+        }
+      })
+      .catch((err) => {
+        console.error(`[HealthChecker] Relogin error for ${platform}:`, err instanceof Error ? err.message : err);
+      });
+  }
+
+  /** Record an error result, auto-upgrade to expired if threshold reached, and create appropriate alerts. */
+  private handleErrorResult(
+    credentials: PlatformCredentials,
+    userId: string,
+    wasExpired: boolean,
+    outcome: ValidationOutcome,
+  ): HealthCheckStatus {
+    const errorMessage = outcome.errorMessage;
+    this.db.credentials.recordHealthCheck(credentials.platform, 'error', 0, errorMessage, userId);
+
+    const failures = this.db.credentials.getConsecutiveFailures(credentials.platform, userId);
+    if (failures >= MAX_CONSECUTIVE_FAILURES) {
+      const reason = `连续 ${failures} 次检查失败: ${errorMessage}`;
+      this.db.credentials.markCredentialExpired(credentials.platform, reason, userId);
+
+      if (!wasExpired) {
+        this.alerter.createAlert({
+          platform: credentials.platform,
+          alertType: 'session_expired',
+          message: reason,
+          userId,
+        });
+        this.maybeTriggerRelogin(credentials.platform, userId);
+      }
+      return 'expired';
+    }
+
+    if (failures === 1 && !wasExpired) {
+      this.alerter.createAlert({
+        platform: credentials.platform,
+        alertType: 'consecutive_failures',
+        message: `健康检查失败: ${errorMessage}`,
+        userId,
+      });
+    }
+
+    return 'error';
   }
 
   /**
@@ -114,93 +210,15 @@ export class SessionHealthChecker {
     const previousHealth = this.db.credentials.getCredentialHealthDetail(credentials.platform, userId);
     const wasExpired = previousHealth?.status === 'expired';
 
-    let status: HealthCheckStatus = 'valid';
-    let errorMessage: string | undefined;
+    const outcome = await this.executeValidation(credentials, userId);
 
-    try {
-      this.db.credentials.recordHealthCheck(credentials.platform, 'checking', 0, undefined, userId);
-
-      const result = await validator.validate(credentials);
-
-      if (result.valid) {
-        status = 'valid';
-      } else {
-        errorMessage = result.error || 'Validation failed';
-        status = 'error';
-      }
-    } catch (err) {
-      errorMessage = err instanceof Error ? err.message : String(err);
-      status = 'error';
-    }
-
-    if (status === 'valid') {
-      this.db.credentials.recordHealthCheck(credentials.platform, 'valid', 0, undefined, userId);
-
-      // Recovery alert: was expired, now valid
-      if (wasExpired) {
-        this.alerter.createAlert({
-          platform: credentials.platform,
-          alertType: 'session_recovered',
-          message: `登录态已恢复正常`,
-          userId,
-        });
-        console.log(`[HealthChecker] ${credentials.platform}: recovered from expired`);
-      }
-    } else {
-      this.db.credentials.recordHealthCheck(credentials.platform, status, 0, errorMessage, userId);
-
-      // Check consecutive failures → auto-upgrade to expired
-      const failures = this.db.credentials.getConsecutiveFailures(credentials.platform, userId);
-      if (failures >= MAX_CONSECUTIVE_FAILURES) {
-        const reason = `连续 ${failures} 次检查失败: ${errorMessage}`;
-        this.db.credentials.markCredentialExpired(credentials.platform, reason, userId);
-
-        if (!wasExpired) {
-          this.alerter.createAlert({
-            platform: credentials.platform,
-            alertType: 'session_expired',
-            message: reason,
-            userId,
-          });
-
-          // Trigger auto-relogin for supported platforms (async, non-blocking)
-          if (this.reloginManager?.isPlatformSupported(credentials.platform)) {
-            if (this.reloginManager.canAttempt(credentials.platform)) {
-              console.log(`[HealthChecker] Triggering auto-relogin for ${credentials.platform}`);
-              void this.reloginManager.attemptRelogin(credentials.platform, userId)
-                .then((result) => {
-                  if (result.success) {
-                    console.log(`[HealthChecker] Auto-relogin succeeded for ${credentials.platform}`);
-                  } else {
-                    console.warn(`[HealthChecker] Auto-relogin failed for ${credentials.platform}: ${result.errorType} - ${result.errorMessage}`);
-                  }
-                })
-                .catch((err) => {
-                  console.error(`[HealthChecker] Relogin error for ${credentials.platform}:`, err instanceof Error ? err.message : err);
-                });
-            } else {
-              console.log(`[HealthChecker] Relogin for ${credentials.platform} is in cooldown or rate-limited`);
-            }
-          }
-        }
-
-        status = 'expired';
-      }
-
-      // Alert on first failure if not already expired
-      if (failures === 1 && !wasExpired) {
-        this.alerter.createAlert({
-          platform: credentials.platform,
-          alertType: 'consecutive_failures',
-          message: `健康检查失败: ${errorMessage}`,
-          userId,
-        });
-      }
-    }
+    const status = outcome.status === 'valid'
+      ? (this.handleValidResult(credentials, userId, wasExpired), 'valid' as HealthCheckStatus)
+      : this.handleErrorResult(credentials, userId, wasExpired, outcome);
 
     console.log(
       `[HealthChecker] ${credentials.platform}: ${status}` +
-        (errorMessage ? ` (${errorMessage})` : '') +
+        (outcome.errorMessage ? ` (${outcome.errorMessage})` : '') +
         (previousHealth ? ` [failures: ${previousHealth.consecutiveFailures}→${this.db.credentials.getConsecutiveFailures(credentials.platform, userId)}]` : ''),
     );
 

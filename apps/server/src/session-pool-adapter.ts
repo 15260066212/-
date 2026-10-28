@@ -16,6 +16,7 @@ import type { BrowserContext } from 'playwright';
 import type { DatabaseAccess } from './db.js';
 import type { ISessionPool, SessionAccount } from '@zemingengine/publisher';
 import { encrypt, decrypt } from '@zemingengine/account-vault';
+import { getPlatformInfoBySessionName } from '@zemingengine/shared';
 
 const MAX_CONCURRENT = 8;
 const SESSION_MAX_AGE_MS = parseInt(process.env.SESSION_MAX_AGE_HOURS || '168', 10) * 60 * 60 * 1000; // 7 days default
@@ -54,19 +55,15 @@ const DEFAULT_FINGERPRINT: Fingerprint = {
   deviceMemory: 16,
 };
 
-const PLATFORM_COOKIE_DOMAINS: Record<string, string[]> = {
-  zhihu: ['.zhihu.com'],
-  csdn: ['.csdn.net'],
-  baijiahao: ['.baijiahao.baidu.com', '.baidu.com'],
-  baike: ['.baike.baidu.com', '.baidu.com'],
-  toutiao: ['.toutiao.com', '.douyin.com'],
-  netease: ['.163.com'],
-  sohu: ['.sohu.com'],
-  juejin: ['.juejin.cn'],
-  bilibili: ['.bilibili.com'],
-  zhidao: ['.zhidao.baidu.com', '.baidu.com'],
-  weixin: ['.qq.com'],
-};
+/**
+ * Get the cookie domains for a platform from the shared platform registry.
+ * Converts registry-style domains (e.g. "zhihu.com") to dot-prefixed format
+ * (e.g. ".zhihu.com") for cookie filtering compatibility.
+ */
+function getPlatformDomains(platform: string): string[] {
+  const info = getPlatformInfoBySessionName(platform);
+  return info?.domains?.map((d) => `.${d}`) ?? [];
+}
 
 export class SessionPoolAdapter implements ISessionPool {
   private db: DatabaseAccess;
@@ -214,7 +211,9 @@ export class SessionPoolAdapter implements ISessionPool {
 
   async close(): Promise<void> {
     for (const [, entry] of this.pool) {
-      try { await entry.context.close(); } catch {}
+      try { await entry.context.close(); } catch (err) {
+        console.warn('[SessionPool] Failed to close browser context', { error: err instanceof Error ? err.message : String(err) });
+      }
     }
     this.pool.clear();
     if (this.browser) {
@@ -232,7 +231,7 @@ export class SessionPoolAdapter implements ISessionPool {
     if (!storageState || typeof storageState !== 'object') return storageState;
     const state = storageState as { cookies?: unknown[]; origins?: unknown[] };
     if (!state.cookies) return storageState;
-    const allowedDomains = PLATFORM_COOKIE_DOMAINS[platform] || [];
+    const allowedDomains = getPlatformDomains(platform);
     if (allowedDomains.length === 0) return storageState;
 
     const filtered = (state.cookies as Array<{ domain?: string }>).filter((cookie) => {

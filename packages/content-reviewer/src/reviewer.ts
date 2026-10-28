@@ -14,6 +14,7 @@ import { checkOriginality } from './rules/originality.js';
 import { checkPlatformAdaptation } from './rules/platform-adaptation.js';
 import { checkReadability } from './rules/readability.js';
 import { checkSafety } from './rules/safety.js';
+import { checkTruthfulness } from './rules/truthfulness.js';
 import { calculateScore, calculateWeightedScore } from './scorer.js';
 import { createHash } from 'crypto';
 
@@ -73,6 +74,7 @@ export class ContentReviewer {
     const platformAdaptationIssues = checkPlatformAdaptation(article);
     const readabilityIssues = checkReadability(article);
     const safetyIssues = checkSafety(article);
+    const truthfulnessIssues = checkTruthfulness(article, session);
 
     const allIssues: ReviewIssue[] = [
       ...complianceIssues,
@@ -83,6 +85,7 @@ export class ContentReviewer {
       ...platformAdaptationIssues,
       ...readabilityIssues,
       ...safetyIssues,
+      ...truthfulnessIssues,
     ];
 
     // Calculate scores for each dimension
@@ -94,6 +97,7 @@ export class ContentReviewer {
     const platform_adaptation = calculateScore(allIssues, 'platform_adaptation');
     const readability = calculateScore(allIssues, 'readability');
     const safety = calculateScore(allIssues, 'safety');
+    const truthfulness = calculateScore(allIssues, 'truthfulness');
 
     const dimensions = {
       compliance,
@@ -104,6 +108,7 @@ export class ContentReviewer {
       platform_adaptation,
       readability,
       safety,
+      truthfulness,
     };
 
     // Calculate weighted overall score
@@ -116,11 +121,13 @@ export class ContentReviewer {
     const hasHighSeverityPlatform = platformAdaptationIssues.some((i) => i.severity === 'high');
     // 3. High-severity safety issues (misleading claims, missing disclaimers)
     const hasHighSeveritySafety = safetyIssues.some((i) => i.severity === 'high');
+    // 3b. High-severity truthfulness issues (fabricated data/products/contradictory facts)
+    const hasHighSeverityTruthfulness = truthfulnessIssues.some((i) => i.severity === 'high');
     // 4. Any dimension scoring below 50 (critical failure in a single dimension)
     const minDimensionScore = Math.min(
       compliance.score, quality.score, seo.score, brand.score,
       originality.score, platform_adaptation.score, readability.score,
-      safety.score,
+      safety.score, truthfulness.score,
     );
 
     const passed =
@@ -128,6 +135,7 @@ export class ContentReviewer {
       !hasHighSeverityCompliance &&
       !hasHighSeverityPlatform &&
       !hasHighSeveritySafety &&
+      !hasHighSeverityTruthfulness &&
       minDimensionScore >= 50;
 
     // Extract all unique suggestions

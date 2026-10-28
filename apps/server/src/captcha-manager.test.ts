@@ -77,19 +77,19 @@ describe('CaptchaManager', () => {
   describe('getCaptchaSelectors', () => {
     it('为已知平台返回平台特定 + 通用选择器', () => {
       const selectors = manager.getCaptchaSelectors('zhihu');
-      expect(selectors.length).toBeGreaterThan(0);
+      expect(selectors.length).toBeGreaterThan(0, 'should be greater than expected for 为已知平台返回平台特定 + 通用选择器');
       // 应该包含平台特定选择器
-      expect(selectors.some((s) => s.selector.includes('geetest'))).toBe(true);
+      expect(selectors.some((s) => s.selector.includes('geetest'))).toBe(true, 'should have correct includes(\'geetest\')) when 为已知平台返回平台特定 + 通用选择器');
       // 应该包含通用选择器（来自 GENERIC_CAPTCHA_SELECTORS）
-      expect(selectors.some((s) => s.type === 'slider')).toBe(true);
+      expect(selectors.some((s) => s.type === 'slider')).toBe(true, 'should have correct type === \'slider\') when 为已知平台返回平台特定 + 通用选择器');
     });
 
     it('为未知平台只返回通用选择器', () => {
       const selectors = manager.getCaptchaSelectors('unknown-platform');
-      expect(selectors.length).toBeGreaterThan(0);
+      expect(selectors.length).toBeGreaterThan(0, 'should be greater than expected for 为未知平台只返回通用选择器');
       // 所有返回的都应该是通用选择器类型
       const types = selectors.map((s) => s.type);
-      expect(types.length).toBeGreaterThan(0);
+      expect(types.length).toBeGreaterThan(0, 'should be greater than expected for 为未知平台只返回通用选择器');
     });
 
     it('每个选择器都有 selector 和 type 字段', () => {
@@ -98,17 +98,17 @@ describe('CaptchaManager', () => {
         'slider', 'geetest', 'image', 'text', 'behavioral', 'sms', 'qrcode', 'unknown',
       ];
       for (const s of selectors) {
-        expect(typeof s.selector).toBe('string');
-        expect(s.selector.length).toBeGreaterThan(0);
-        expect(validTypes).toContain(s.type);
+        expect(typeof s.selector).toBe('string', 'should have correct selector when 每个选择器都有 selector 和 type 字段');
+        expect(s.selector.length).toBeGreaterThan(0, 'should be greater than expected for 每个选择器都有 selector 和 type 字段');
+        expect(validTypes).toContain(s.type, 'should contain expected value in validTypes for 每个选择器都有 selector 和 type 字段');
       }
     });
 
     it('支持所有主要发布平台', () => {
-      const platforms = ['zhihu', 'baijia', 'toutiao', 'csdn', 'juejin', 'bilibili', 'sohu', 'netease', 'zhidao'];
+      const platforms = ['zhihu', 'toutiao', 'csdn', 'juejin', 'sohu', 'netease'];
       for (const p of platforms) {
         const selectors = manager.getCaptchaSelectors(p);
-        expect(selectors.length).toBeGreaterThan(0);
+        expect(selectors.length).toBeGreaterThan(0, 'should be greater than expected for 支持所有主要发布平台');
       }
     });
   });
@@ -116,17 +116,17 @@ describe('CaptchaManager', () => {
   describe('recordCaptcha', () => {
     it('记录验证码事件并返回事件 ID', () => {
       const eventId = manager.recordCaptcha('zhihu', 'geetest', 'publish', 'task-123');
-      expect(eventId).toBeGreaterThan(0);
+      expect(eventId).toBeGreaterThan(0, 'should be greater than expected for 记录验证码事件并返回事件 ID');
       expect(mockDb.selectors.recordCaptchaEvent).toHaveBeenCalledWith(
         'zhihu', 'geetest', 'publish', 'task-123', undefined, undefined, undefined,
       );
     });
 
     it('创建健康告警', () => {
-      manager.recordCaptcha('baijia', 'slider', 'login');
-      expect(mockDb.credentials.insertHealthAlert).toHaveBeenCalled();
+      manager.recordCaptcha('toutiao', 'slider', 'login');
+      expect(mockDb.credentials.insertHealthAlert).toHaveBeenCalled('should have been called for 创建健康告警');
       const callArgs = mockDb.credentials.insertHealthAlert.mock.calls[0];
-      expect(callArgs[0]).toBe('baijia');
+      expect(callArgs[0]).toBe('toutiao', 'should have correct callArgs[0] when 创建健康告警');
       expect(callArgs[1]).toBe('captcha_detected');
       expect(callArgs[2]).toContain('Captcha detected');
     });
