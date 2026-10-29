@@ -5,14 +5,16 @@
  *   shared Article  →  WechatSync Core Article  →  adapter.publish() → 平台 API
  *
  * Cookie 来源（按优先级）：
- *   1. cookies 参数直接传入（可从 credentials.data 读取）
- *   2. cookiesProvider() 动态提供（可用于 Chrome profile 导出）
- *   3. checkAuth 失败时自动触发 cookiesProvider() 重导 Cookie → 重试一次
+ *   1. credentials.data.cookies（Cookie 数组 / JSON 字符串）
+ *   2. credentials.data.cookie（harvester 同步的 Cookie 头字符串，按账号隔离）
+ *   3. cookiesProvider() 动态提供（从 Chrome profile 导出）
+ *   4. checkAuth 失败时自动触发 cookiesProvider() 重导 Cookie → 重试一次
  */
 import type { Article, PlatformCredentials, PlatformId } from '@zemingengine/shared';
+import { getPlatformDomains } from '@zemingengine/shared';
 import type { PublishParams, PublishResult } from '../types.js';
 import { PlatformAdapter } from './base.js';
-import { NodeRuntime, formatCookiesForRuntime } from '../node-runtime.js';
+import { NodeRuntime, formatCookiesForRuntime, parseCookieHeader } from '../node-runtime.js';
 import type { Cookie } from '../node-runtime.js';
 
 // 平台 ID 映射：@zemingengine/shared PlatformId → @wechatsync/core adapter id
@@ -35,9 +37,17 @@ export interface WechatSyncCoreAdapterOptions {
 
 export class WechatSyncCoreAdapter extends PlatformAdapter {
   private readonly options: WechatSyncCoreAdapterOptions;
-  private _runtime: NodeRuntime | null = null;
-  private _adapter: any = null;
   private _registered = false;
+  /**
+   * 同平台发布串行队列。
+   *
+   * Publisher 里每个 platform 只注册一个 adapter 单例，多个会话同时发布同一平台时，
+   * 若把 runtime/adapter 存在实例字段上会互相覆盖，导致 A 账号的文章用 B 账号的
+   * Cookie 写进 B 的草稿箱。这里同时做两件事：
+   *   1. 每次发布都用局部 runtime/adapter，不再写实例字段；
+   *   2. 同一 adapter 实例的 publish 串行执行（跨平台互不影响）。
+   */
+  private _publishChain: Promise<unknown> = Promise.resolve();
 
   constructor(platform: PlatformId, options: WechatSyncCoreAdapterOptions = {}) {
     super(platform);
@@ -72,16 +82,14 @@ export class WechatSyncCoreAdapter extends PlatformAdapter {
     }
   }
 
-  /** 初始化 runtime + adapter 实例 */
-  private async _ensureAdapter(cookies: Cookie[]): Promise<boolean> {
+  /** 初始化 runtime + adapter 实例（全部为局部对象，不写实例字段） */
+  private async _createAdapter(cookies: Cookie[]): Promise<{ adapter: any; runtime: NodeRuntime } | null> {
     const Ctor = await this._loadAdapterCtor();
-    if (!Ctor) return false;
+    if (!Ctor) return null;
 
-    this._runtime = new NodeRuntime(formatCookiesForRuntime(cookies), { debug: this.options.debug });
-
+    const runtime = new NodeRuntime(formatCookiesForRuntime(cookies), { debug: this.options.debug });
     const adapter = new Ctor();
     const mod: any = await import('@zemingengine/wechatsync-core/adapters');
-    mod.adapterRegistry.setRuntime(this._runtime);
 
     if (!this._registered) {
       try {
@@ -94,9 +102,8 @@ export class WechatSyncCoreAdapter extends PlatformAdapter {
       } catch { /* already registered */ }
     }
 
-    (adapter as any).runtime = this._runtime;
-    this._adapter = adapter;
-    return true;
+    (adapter as any).runtime = runtime;
+    return { adapter, runtime };
   }
 
   /** 从 credentials 或 cookiesProvider 获取 Cookie */
@@ -113,7 +120,15 @@ export class WechatSyncCoreAdapter extends PlatformAdapter {
     }
     if (Array.isArray(rawCookies) && rawCookies.length > 0) return rawCookies as Cookie[];
 
-    // 2. cookiesProvider 动态获取
+    // 2. credentials.data.cookie（harvester 同步的 Cookie 头字符串，主库的常规格式）
+    const rawHeader = (cred.data as any)?.cookie;
+    if (typeof rawHeader === 'string' && rawHeader.trim().length > 0) {
+      const domain = getPlatformDomains(this.platform)[0];
+      const parsed = domain ? parseCookieHeader(rawHeader, domain) : [];
+      if (parsed.length > 0) return parsed;
+    }
+
+    // 3. cookiesProvider 动态获取
     if (this.options.cookiesProvider) {
       try {
         const cookies = await this.options.cookiesProvider(this.platform, cred);
@@ -138,6 +153,13 @@ export class WechatSyncCoreAdapter extends PlatformAdapter {
   }
 
   async publish(params: PublishParams): Promise<PublishResult> {
+    // 同平台串行，避免多会话并发发布时互相覆盖凭证
+    const run = this._publishChain.then(() => this._publishOnce(params));
+    this._publishChain = run.catch(() => {});
+    return run;
+  }
+
+  private async _publishOnce(params: PublishParams): Promise<PublishResult> {
     const cred = params.credentials;
 
     // 获取 Cookie
@@ -146,22 +168,25 @@ export class WechatSyncCoreAdapter extends PlatformAdapter {
       return { success: false, error: `无可用 Cookie。请为账号 ${cred.accountId} 配置 Cookie 或 cookiesProvider。平台: ${this.platform}` };
     }
 
-    // 初始化
-    const ok = await this._ensureAdapter(cookies);
-    if (!ok) {
+    // 初始化（局部实例，本次发布独享）
+    let ctx = await this._createAdapter(cookies);
+    if (!ctx) {
       return { success: false, error: `无法初始化 @wechatsync/core adapter for ${this.platform}（平台可能不在公开适配器列表中）` };
     }
 
     // checkAuth
-    const auth = await this._adapter!.checkAuth();
+    const auth = await ctx.adapter.checkAuth();
     if (!auth.isAuthenticated) {
       console.warn(`[WechatSyncCoreAdapter] checkAuth 失败，尝试重导 Cookie 重试...`);
       if (this.options.cookiesProvider) {
         try {
           const fresh = await this.options.cookiesProvider(this.platform, cred);
           if (fresh.length > 0) {
-            await this._ensureAdapter(fresh);
-            const retry = await this._adapter!.checkAuth();
+            ctx = await this._createAdapter(fresh);
+            if (!ctx) {
+              return { success: false, error: `重导 Cookie 后仍无法初始化 adapter。平台: ${this.platform}` };
+            }
+            const retry = await ctx.adapter.checkAuth();
             if (!retry.isAuthenticated) {
               return { success: false, error: `checkAuth 失败（重导 Cookie 后仍未登录）。平台: ${this.platform}` };
             }
@@ -181,7 +206,7 @@ export class WechatSyncCoreAdapter extends PlatformAdapter {
 
     // 发布（存草稿）
     const coreArticle = this._adaptArticle(params.article);
-    const result = await this._adapter!.publish(coreArticle, { draft: true });
+    const result = await ctx.adapter.publish(coreArticle, { draft: true });
 
     if (result.success) {
       return {

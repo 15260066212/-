@@ -1,11 +1,12 @@
 /**
- * Embedding 服务 — 统一接口，可插拔后端。
+ * Embedding 服务 — 统一接口，可插拔后端（OpenAI 协议兼容）。
  *
- * 芯图EK 的 L2 信源写入 Milvus 前需要向量化。此文件封装 embedding 提供方，
- * 让 MilvusRepository 和 stage4-knowledge 不关心底层调用哪个 API。
+ * 当前支持：
+ *   - SiliconFlow（BAAI/bge-m3 等稳定中文模型，推荐，国内直连）
+ *   - 火山方舟豆包（接入点模式，`ep-xxx` 作为 model 参数）
  *
- * 当前支持：豆包火山方舟（doubao-embedding）。
- * 后续可扩展：OpenAI / 本地 BGE ONNX sidecar。
+ * 两个 provider 都走 OpenAI `/v1/embeddings` 协议，这里合并成一个通用实现，
+ * 工厂按环境变量优先级选，避免为每个平台各写一个类。
  */
 
 export interface EmbeddingProvider {
@@ -14,69 +15,59 @@ export interface EmbeddingProvider {
   readonly model: string;
 }
 
-class VolcengineEmbedding implements EmbeddingProvider {
+/** OpenAI 协议通用 embedding — SiliconFlow / 豆包 / 阿里云百炼兼容模式都走这里。 */
+class OpenAICompatibleEmbedding implements EmbeddingProvider {
   readonly dim: number;
   readonly model: string;
   private readonly apiKey: string;
   private readonly baseUrl: string;
 
   constructor() {
-    const apiKey = process.env.VOLCENGINE_API_KEY ?? process.env.DOUBAO_API_KEY;
-    const endpointId = process.env.DOUBAO_EMBEDDING_ENDPOINT;
-    const modelName = process.env.DOUBAO_EMBEDDING_MODEL ?? 'doubao-embedding-text';
-    const dim = parseInt(process.env.EMBEDDING_DIM ?? '1024', 10);
+    const sfKey = process.env.SILICONFLOW_API_KEY;
+    const arkKey = process.env.VOLCENGINE_API_KEY ?? process.env.DOUBAO_API_KEY;
+    const arkEndpoint = process.env.DOUBAO_EMBEDDING_ENDPOINT;
+    const provider = process.env.EMBEDDING_PROVIDER; // 'siliconflow' | 'volcengine' | undefined=自动
 
-    if (!apiKey) {
-      throw new Error('[Embedding] 缺少 VOLCENGINE_API_KEY / DOUBAO_API_KEY');
+    if (provider === 'siliconflow' || (!provider && sfKey)) {
+      this.apiKey = sfKey!;
+      this.baseUrl = process.env.SILICONFLOW_BASE_URL ?? 'https://api.siliconflow.cn/v1';
+      this.model = process.env.SILICONFLOW_EMBEDDING_MODEL ?? 'BAAI/bge-m3';
+    } else if (provider === 'volcengine' || (!provider && arkKey && arkEndpoint)) {
+      this.apiKey = arkKey!;
+      this.baseUrl = process.env.DOUBAO_BASE_URL ?? 'https://ark.cn-beijing.volces.com/api/v3';
+      this.model = arkEndpoint ?? process.env.DOUBAO_EMBEDDING_MODEL ?? 'doubao-embedding-text';
+    } else {
+      throw new Error(
+        '[Embedding] 未找到可用 provider：需要 SILICONFLOW_API_KEY 或 (VOLCENGINE_API_KEY + DOUBAO_EMBEDDING_ENDPOINT)'
+      );
     }
 
-    // 火山方舟走接入点模式 — 如果用户提供了 endpoint ID，就用它作为 model 参数
-    // 否则回退到直接模型名（某些账号可能直接用模型名）
-    this.model = endpointId ?? modelName;
-    this.apiKey = apiKey;
-    this.baseUrl = process.env.DOUBAO_BASE_URL ?? 'https://ark.cn-beijing.volces.com/api/v3';
-    this.dim = dim;
+    this.dim = parseInt(process.env.EMBEDDING_DIM ?? '1024', 10);
   }
 
   async embedTexts(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
 
-    // 豆包 embedding 支持 batch，但单批有上限，这里简单地单条调用
-    // 生产环境可改为批量以提升吞吐
-    const results: number[][] = [];
-    for (const text of texts) {
-      const body = JSON.stringify({
-        model: this.model,
-        input: text,
-        dim: this.dim,
-      });
+    const body = JSON.stringify({ model: this.model, input: texts, dim: this.dim });
 
-      const res = await fetch(`${this.baseUrl}/embeddings`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body,
-        signal: AbortSignal.timeout(15_000),
-      });
+    const res = await fetch(`${this.baseUrl.replace(/\/$/, '')}/embeddings`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(30_000),
+    });
 
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(
-          `[Embedding] HTTP ${res.status} for ${this.model}: ${errText.slice(0, 200)}`
-        );
-      }
-
-      const data = await res.json();
-      if (data?.data?.[0]?.embedding) {
-        results.push(data.data[0].embedding);
-      } else {
-        throw new Error(`[Embedding] 响应异常: ${JSON.stringify(data).slice(0, 200)}`);
-      }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`[Embedding] HTTP ${res.status} for ${this.model}: ${errText.slice(0, 200)}`);
     }
 
-    return results;
+    const data = await res.json();
+    if (!Array.isArray(data?.data)) {
+      throw new Error(`[Embedding] 响应异常: ${JSON.stringify(data).slice(0, 200)}`);
+    }
+    const sorted = [...data.data].sort((a: { index: number }, b: { index: number }) => a.index - b.index);
+    return sorted.map((item: { embedding: number[] }) => item.embedding);
   }
 }
 
@@ -101,23 +92,28 @@ class ZeroEmbedding implements EmbeddingProvider {
 /**
  * 工厂函数 — 根据环境变量选 provider。
  *
- * - 若 MILVUS_URI 未设置 → 返回 null（表示 Milvus 整体未启用，上层应该跳过向量操作）
- * - 若 VOLCENGINE_API_KEY 或 DOUBAO_API_KEY 设置了 → 使用豆包 embedding
- * - 否则 → 返回 ZeroEmbedding（Milvus 写入可跑，语义召回暂不可用）
+ * - MILVUS_URI 未设置 → 返回 null（Milvus 整体未启用）
+ * - SILICONFLOW_API_KEY 存在 → SiliconFlow（推荐，自动优先）
+ * - 否则若 VOLCENGINE_API_KEY + DOUBAO_EMBEDDING_ENDPOINT 都在 → 豆包方舟
+ * - 都没有 → 返回 ZeroEmbedding（Milvus 写入能跑，语义召回暂为零）
+ *
+ * EMBEDDING_PROVIDER='siliconflow' | 'volcengine' 可强制切换优先级。
  */
 export function createEmbeddingProvider(): EmbeddingProvider | null {
   if (!process.env.MILVUS_URI) return null;
 
-  // 方舟是接入点模式：没有 DOUBAO_EMBEDDING_ENDPOINT（ep-xxxx）时调用必然 404，
-  // 直接用 ZeroEmbedding 占位，避免每次召回都白白发起一次必失败的网络请求。
-  if (process.env.DOUBAO_EMBEDDING_ENDPOINT && (process.env.VOLCENGINE_API_KEY || process.env.DOUBAO_API_KEY)) {
-    try {
-      return new VolcengineEmbedding();
-    } catch (e) {
-      console.warn('[Embedding] 豆包初始化失败，回退到 ZeroEmbedding:', e instanceof Error ? e.message : e);
+  try {
+    if (process.env.SILICONFLOW_API_KEY) {
+      return new OpenAICompatibleEmbedding();
     }
+    if (process.env.VOLCENGINE_API_KEY && process.env.DOUBAO_EMBEDDING_ENDPOINT) {
+      return new OpenAICompatibleEmbedding();
+    }
+    const dim = parseInt(process.env.EMBEDDING_DIM ?? '1024', 10);
+    return new ZeroEmbedding(dim);
+  } catch (e) {
+    console.warn('[Embedding] 真实 embedding 初始化失败，回退到 ZeroEmbedding:', e instanceof Error ? e.message : e);
+    const dim = parseInt(process.env.EMBEDDING_DIM ?? '1024', 10);
+    return new ZeroEmbedding(dim);
   }
-
-  const dim = parseInt(process.env.EMBEDDING_DIM ?? '1024', 10);
-  return new ZeroEmbedding(dim);
 }

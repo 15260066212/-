@@ -26,7 +26,7 @@ interface WritingProtocol {
   role?: string;
   red_lines?: ProtocolRedLine[];
   structure?: Record<string, unknown>;
-  word_count?: { target?: string; floor?: number; rules?: string[] };
+  word_count?: { target?: string; floor?: number; hard_cap?: number; rules?: string[] };
   data_integrity?: string[];
   ek_reference?: {
     knowledge_base_name?: string;
@@ -93,6 +93,9 @@ export function buildProtocolLines(): string[] {
   if (p.word_count) {
     lines.push('【字数要求】');
     lines.push(`- 正文目标 ${p.word_count.target ?? '800-1500'} 字，低于 ${p.word_count.floor ?? 800} 字不许交付`);
+    if (p.word_count.hard_cap) {
+      lines.push(`- ⚠️ 硬性上限 ${p.word_count.hard_cap} 字，超过即自动截断；平台默认字数范围与此冲突时以本条为准`);
+    }
     (p.word_count.rules ?? []).forEach((r) => lines.push(`- ${r}`));
     lines.push('');
   }
@@ -133,6 +136,9 @@ export function buildProtocolLines(): string[] {
   if (p.output_format) {
     lines.push('【协议输出格式】');
     lines.push(p.output_format.trim());
+    // 协议的「直接输出 Markdown 正文」只约束 content 字段内容，
+    // 整体回复必须仍是 JSON，否则生成侧解析失败会静默降级为模板。
+    lines.push('说明：以上格式约束针对 content 字段内的正文；整体回复仍必须严格按本提示末尾的 JSON 结构返回，正文放入 content 字段。');
     lines.push('');
   }
 

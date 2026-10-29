@@ -21,12 +21,44 @@ import {
   closeSession,
   upsertCredential,
   getProxyOptions,
+  mainServerClient,
 } from '../config/index.js';
+import { createCookieCredential } from '../lib/credential-model.js';
 import { injectStealth } from '../lib/stealth.js';
 import { PLATFORM_URLS, PLATFORM_NAMES } from '../config/platforms.js';
 import type { Express, Request, Response } from 'express';
 
 export function registerSessionRoutes(app: Express): void {
+  /**
+   * 把本地已保存的 Cookie 同步到主 server。
+   * 用 POST /api/credentials/sync（带 accountId），而不是 PUT /api/credentials/{key}：
+   * 后者的 key 形如 `default:csdn` 会被主 server 当作非法平台名拒绝。
+   */
+  async function syncCookieToMainServer(params: {
+    platform: string;
+    accountName: string;
+    cookie: string;
+    cookieCount: number;
+    status: 'active' | 'expired' | 'invalid';
+  }): Promise<{ success: boolean; error?: string }> {
+    const result = await mainServerClient.syncCredential(
+      createCookieCredential({
+        platform: params.platform,
+        platformName: PLATFORM_NAMES[params.platform],
+        accountName: params.accountName,
+        cookie: params.cookie,
+        cookieCount: params.cookieCount,
+        status: params.status,
+      }),
+    );
+    if (!result.success) {
+      console.warn(
+        `[Credentials] 同步 ${params.platform} 到主 server 失败: ${result.error ?? 'unknown'}`,
+      );
+    }
+    return result;
+  }
+
   /**
    * POST /api/session/start
    */
@@ -96,7 +128,16 @@ export function registerSessionRoutes(app: Express): void {
       await page.setViewportSize({ width: 1280, height: 800 });
 
       const loginUrl = PLATFORM_URLS[platform];
-      await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // 首次访问部分平台的登录域（如搜狐 plus.sohu.com → v4.passport.sohu.com）可能耗时 15s+，
+      // 30s 超时会让整个会话启动失败。这里放宽到 60s，且失败也继续返回会话，
+      // 用户仍可在已打开的浏览器里手动导航登录。
+      try {
+        await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      } catch (navErr) {
+        console.warn(
+          `[Session] 初始页面加载失败（会话仍可用，可手动导航）: ${(navErr as Error).message}`,
+        );
+      }
 
       sessions.set(sessionId, {
         browser: null,
@@ -207,6 +248,8 @@ export function registerSessionRoutes(app: Express): void {
       console.log(`[Session] Extracted ${platformCookies.length} cookies for ${session.platform}, auth: ${hasAuthCookie}`);
 
       let autoSaved = false;
+      let syncedToMain = false;
+      let syncError: string | undefined;
       if (hasAuthCookie && cookieString) {
         const credKey = `${session.accountName || 'default'}:${session.platform}`;
         autoSaved = upsertCredential(credKey, {
@@ -221,6 +264,15 @@ export function registerSessionRoutes(app: Express): void {
         });
         if (autoSaved) {
           console.log(`[Credentials] Auto-saved cookies for ${session.platform}`);
+          const syncResult = await syncCookieToMainServer({
+            platform: session.platform,
+            accountName: session.accountName || 'default',
+            cookie: cookieString,
+            cookieCount: platformCookies.length,
+            status: 'active',
+          });
+          syncedToMain = syncResult.success;
+          syncError = syncResult.error;
         }
       }
 
@@ -235,6 +287,8 @@ export function registerSessionRoutes(app: Express): void {
         cookieCount: platformCookies.length,
         extractedAt: new Date().toISOString(),
         autoSaved,
+        syncedToMain,
+        syncError,
       });
     } catch (error: unknown) {
       const err = error as Error;
@@ -314,6 +368,20 @@ export function registerSessionRoutes(app: Express): void {
 
       console.log(`[Credentials] Manually saved ${platformCookies.length} cookies for ${session.platform} (auth: ${hasAuthCookie}, saved: ${saved})`);
 
+      let syncedToMain = false;
+      let syncError: string | undefined;
+      if (saved) {
+        const syncResult = await syncCookieToMainServer({
+          platform: session.platform,
+          accountName: session.accountName || 'default',
+          cookie: cookieString,
+          cookieCount: platformCookies.length,
+          status: hasAuthCookie ? 'active' : 'invalid',
+        });
+        syncedToMain = syncResult.success;
+        syncError = syncResult.error;
+      }
+
       res.json({
         success: saved,
         sessionId,
@@ -322,6 +390,8 @@ export function registerSessionRoutes(app: Express): void {
         cookieCount: platformCookies.length,
         hasAuthCookie,
         status: hasAuthCookie ? 'active' : 'unknown',
+        syncedToMain,
+        syncError,
         savedAt: new Date().toISOString(),
       });
     } catch (error: unknown) {

@@ -20,16 +20,16 @@ describe('filterDueTasks', () => {
     ];
 
     const due = filterDueTasks(tasks, now);
-    expect(due.map((t) => t.id)).toEqual(['t1', 't3']);
+    expect(due.map((t) => t.id)).toEqual(['t1', 't3', 't5']);
   });
 
   it('空任务列表返回空数组', () => {
     expect(filterDueTasks([], now)).toEqual([]);
   });
 
-  it('没有 scheduledAt 的任务不被视为到期', () => {
+  it('没有 scheduledAt 的任务视为立即到期（防止孤儿任务永久卡死）', () => {
     const tasks = [createMockPublishTask({ status: 'pending' })];
-    expect(filterDueTasks(tasks, now)).toEqual([]);
+    expect(filterDueTasks(tasks, now).length).toBe(1);
   });
 });
 

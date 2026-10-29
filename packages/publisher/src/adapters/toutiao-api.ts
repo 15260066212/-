@@ -19,8 +19,9 @@
 import type { Article, PlatformCredentials } from '@zemingengine/shared';
 import type { PublishParams, PublishResult } from '../types.js';
 import { PlatformAdapter } from './base.js';
-import { NodeRuntime, formatCookiesForRuntime } from '../node-runtime.js';
+import { NodeRuntime, formatCookiesForRuntime, parseCookieHeader } from '../node-runtime.js';
 import type { Cookie } from '../node-runtime.js';
+import { getPlatformDomains } from '@zemingengine/shared';
 
 export type ToutiaoCookieProvider = (
   platform: string,
@@ -61,7 +62,14 @@ const IMAGE_SKIP_PATTERNS = ['pstatp.com', 'toutiao.com', 'byteimg.com', 'zjcdn.
 
 export class ToutiaoApiAdapter extends PlatformAdapter {
   private readonly options: ToutiaoApiAdapterOptions;
-  private _runtime: NodeRuntime | null = null;
+  /**
+   * 同平台发布串行队列 + 每次发布使用局部 runtime。
+   *
+   * Publisher 每个平台只注册一个 adapter 单例。若把 runtime 存在实例字段上，
+   * 多会话/多账号并发发布时会互相覆盖，A 账号的文章可能带着 B 账号的 Cookie
+   * 写进 B 的草稿箱。这里不再持有实例级 runtime，并让同一实例的 publish 串行执行。
+   */
+  private _publishChain: Promise<unknown> = Promise.resolve();
 
   constructor(options: ToutiaoApiAdapterOptions = {}) {
     super('toutiao');
@@ -80,6 +88,14 @@ export class ToutiaoApiAdapter extends PlatformAdapter {
     }
     if (Array.isArray(rawCookies) && rawCookies.length > 0) return rawCookies as Cookie[];
 
+    // 2. credentials.data.cookie（harvester 同步到主库的 Cookie 头字符串，主库的常规格式）
+    const rawHeader = (credentials.data as any)?.cookie;
+    if (typeof rawHeader === 'string' && rawHeader.trim().length > 0) {
+      const domain = getPlatformDomains(this.platform)[0];
+      const parsed = domain ? parseCookieHeader(rawHeader, domain) : [];
+      if (parsed.length > 0) return parsed;
+    }
+
     if (this.options.cookiesProvider) {
       try {
         const cookies = await this.options.cookiesProvider(this.platform, credentials);
@@ -91,8 +107,8 @@ export class ToutiaoApiAdapter extends PlatformAdapter {
     return [];
   }
 
-  private _ensureRuntime(cookies: Cookie[]): void {
-    this._runtime = new NodeRuntime(formatCookiesForRuntime(cookies), {
+  private _createRuntime(cookies: Cookie[]): NodeRuntime {
+    return new NodeRuntime(formatCookiesForRuntime(cookies), {
       debug: this.options.debug,
     });
   }
@@ -107,10 +123,17 @@ export class ToutiaoApiAdapter extends PlatformAdapter {
     if (cookies.length === 0) {
       return { isAuthenticated: false, error: '无可用 Cookie' };
     }
-    this._ensureRuntime(cookies);
+    return this._checkAuthWith(this._createRuntime(cookies));
+  }
 
+  private async _checkAuthWith(runtime: NodeRuntime): Promise<{
+    isAuthenticated: boolean;
+    username?: string;
+    userId?: string;
+    error?: string;
+  }> {
     try {
-      const resp = await this._runtime!.fetch(
+      const resp = await runtime.fetch(
         'https://mp.toutiao.com/mp/agw/media/get_media_info',
         { method: 'GET', headers: { 'Referer': ORIGIN } },
       );
@@ -155,9 +178,9 @@ export class ToutiaoApiAdapter extends PlatformAdapter {
    * v1 端点: POST /tools/catch_picture/  body: upfile=<src>&version=2
    * 响应形态不确定，尽力解析；失败则保留原图（草稿可在编辑器里修）
    */
-  private async _relayImage(src: string): Promise<string | null> {
+  private async _relayImage(src: string, runtime: NodeRuntime): Promise<string | null> {
     try {
-      const resp = await this._runtime!.fetch('https://mp.toutiao.com/tools/catch_picture/', {
+      const resp = await runtime.fetch('https://mp.toutiao.com/tools/catch_picture/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -181,7 +204,7 @@ export class ToutiaoApiAdapter extends PlatformAdapter {
   }
 
   /** 替换外域图片为头条图床，失败保留原图 */
-  private async _processImages(html: string): Promise<string> {
+  private async _processImages(html: string, runtime: NodeRuntime): Promise<string> {
     const imgRe = /<img\s[^>]*src=["']([^"']+)["'][^>]*>/gi;
     const matches: Array<{ full: string; src: string }> = [];
     let m: RegExpExecArray | null;
@@ -193,7 +216,7 @@ export class ToutiaoApiAdapter extends PlatformAdapter {
     for (const { full, src } of matches) {
       if (IMAGE_SKIP_PATTERNS.some(p => src.includes(p))) continue;
       if (!src.startsWith('http')) continue;
-      const relayed = await this._relayImage(src);
+      const relayed = await this._relayImage(src, runtime);
       if (relayed) {
         result = result.replace(full, full.replace(src, relayed));
       }
@@ -207,14 +230,26 @@ export class ToutiaoApiAdapter extends PlatformAdapter {
   }
 
   async publish(params: PublishParams): Promise<PublishResult> {
-    // 1. 认证（失败自动重导 Cookie 重试一次）
-    let auth = await this.checkAuth(params.credentials);
+    // 同平台串行：两个账号的发布请求交错执行时，各自持有独立的局部 runtime，不会串号
+    const run = this._publishChain.then(() => this._publishOnce(params));
+    this._publishChain = run.catch(() => {});
+    return run;
+  }
+
+  private async _publishOnce(params: PublishParams): Promise<PublishResult> {
+    // 1. 认证（失败自动重导 Cookie 重试一次）—— runtime 全部是局部变量
+    const cookies = await this._getCookies(params.credentials);
+    if (cookies.length === 0) {
+      return { success: false, error: '头条号未登录: 无可用 Cookie' };
+    }
+    let runtime = this._createRuntime(cookies);
+    let auth = await this._checkAuthWith(runtime);
     if (!auth.isAuthenticated && this.options.cookiesProvider) {
       try {
         const fresh = await this.options.cookiesProvider(this.platform, params.credentials);
         if (fresh.length > 0) {
-          this._ensureRuntime(fresh);
-          auth = await this.checkAuth(params.credentials);
+          runtime = this._createRuntime(fresh);
+          auth = await this._checkAuthWith(runtime);
         }
       } catch { /* keep first error */ }
     }
@@ -228,7 +263,7 @@ export class ToutiaoApiAdapter extends PlatformAdapter {
     try {
       // 2. 准备内容
       let content = this._cleanHtml(await this._toHtml(params.article));
-      content = await this._processImages(content);
+      content = await this._processImages(content, runtime);
       content = this._wrapImages(content);
       content = content.replace(/<figure[^>]*>\s*<\/figure>/gi, '').replace(/\n{3,}/g, '\n\n');
 
@@ -277,7 +312,7 @@ export class ToutiaoApiAdapter extends PlatformAdapter {
       });
 
       // 4. 发布请求
-      const resp = await this._runtime!.fetch(
+      const resp = await runtime.fetch(
         'https://mp.toutiao.com/mp/agw/article/publish?source=mp&type=article&aid=1231',
         {
           method: 'POST',

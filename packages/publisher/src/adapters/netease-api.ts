@@ -1,25 +1,25 @@
 /**
- * NeteaseApiAdapter —— 网易号（mp.163.com）纯 Node.js 适配器骨架
+ * NeteaseApiAdapter —— 网易号（mp.163.com）纯 Node.js 适配器
  *
- * ⚠️ 当前状态：骨架。checkAuth 可用；publish 需要抓包补全。
+ * 实现依据：已安装的「文章同步助手」（WechatSync v2）扩展包内自带的
+ * NeteaseAdapter（meta.id = 'netease'）——它走的是 mp.163.com 站内接口，
+ * 而不是 Playwright 页面操作。核心接口：
+ *   1. 登录态：GET  https://mp.163.com/wemedia/navinfo.do?_=<ts>
+ *              → { code:1, data:{ tid, tname, icon, realUserId } }
+ *   2. 存草稿：POST https://mp.163.com/wemedia/article/status/api/publishV2.do
+ *              ?_=<ts>&wemediaId=<tid>&realUserId=<realUserId>
+ *              body(form-urlencoded): wemediaId / articleId=-1 / title / content
+ *              / cover=threeImg / operation=saveDraft / scheduled=0 / ursToken
+ *              / onlineState=1 / picUrl / original=0 / subjectId
+ *   3. 传图：  POST https://mp.163.com/wemedia/article/api/uploadCoverImage.do?wemediaId=<tid>
+ *              multipart，字段名 file → { code:1, data:{ url | picUrl } }
  *
- * 背景：网易号编辑器是 React SPA + DraftJS，所有公开开源实现
- * （wechatsync / artipub / wangyi-publish-skill）都走 Playwright CDP，
- * 没有人逆向过纯 fetch API。
- *
- * 启用方式（需要抓包后）：
- *   1. 在浏览器登录 mp.163.com，进入 https://mp.163.com/#/article-publish
- *   2. 打开 DevTools Network，填标题+正文，等 1 分钟自动保存触发
- *   3. 抓保存草稿的 XHR（应该是 POST /mp/media/api/... 或 /api/...）
- *   4. 把端点 + 请求体字段填到下方 PUBLISH_API 和 buildDraftBody()
- *   5. 在 Publisher.createDefault() 里注册：
- *      pub.registerAdapter(new NeteaseApiAdapter({ cookiesProvider: exportCookiesFromChrome }))
- *
- * 风险：
- *   - 网易易盾滑块（登录环节）
- *   - 账号实名认证门槛（未认证点发布会弹窗，但草稿可保存）
+ * ⚠️ 唯一无法纯 Node 复现的环节：ursToken。
+ * 插件里是用 tabs + `window.neg.getToken()` 在已登录的 mp.163.com 页面里取的。
+ * NodeRuntime 没有 tabs 能力，因此这里退化为传空字符串（与插件取不到 token 时
+ * 的行为一致）。若服务端强校验，可通过 ursTokenProvider 注入外部获取的 token。
  */
-import type { Article, PlatformCredentials, PlatformId } from '@zemingengine/shared';
+import type { PlatformCredentials, PlatformId } from '@zemingengine/shared';
 import type { PublishParams, PublishResult } from '../types.js';
 import { PlatformAdapter } from './base.js';
 import { NodeRuntime, formatCookiesForRuntime } from '../node-runtime.js';
@@ -32,18 +32,29 @@ export type NeteaseCookieProvider = (
 
 export interface NeteaseApiAdapterOptions {
   cookiesProvider?: NeteaseCookieProvider;
+  /** 自定义 ursToken 获取方式（可选，默认传空串） */
+  ursTokenProvider?: () => Promise<string | undefined>;
   debug?: boolean;
 }
 
-// ===== 待抓包补全的 API 端点 =====
-// 登录态检查：用首页 GET 即可（响应含账号信息则已登录，跳登录页则未登录）
-const CHECK_AUTH_URL = 'https://mp.163.com/';
-// 草稿保存：⚠️ 未抓包，目前是占位符
-const DRAFT_API_URL = 'https://mp.163.com/mp/media/api/article/saveDraft'; // TODO: 抓包确认
+const NAVINFO_URL = 'https://mp.163.com/wemedia/navinfo.do';
+const PUBLISH_URL = 'https://mp.163.com/wemedia/article/status/api/publishV2.do';
+const UPLOAD_URL = 'https://mp.163.com/wemedia/article/api/uploadCoverImage.do';
+
+const PAGE_HEADERS = {
+  Origin: 'https://mp.163.com',
+  Referer: 'https://mp.163.com/subscribe_v4/index.html',
+};
+
+interface NeteaseAccount {
+  tid: string;
+  tname?: string;
+  icon?: string;
+  realUserId?: string;
+}
 
 export class NeteaseApiAdapter extends PlatformAdapter {
   private readonly options: NeteaseApiAdapterOptions;
-  private _runtime: NodeRuntime | null = null;
 
   constructor(options: NeteaseApiAdapterOptions = {}) {
     super('netease');
@@ -58,7 +69,7 @@ export class NeteaseApiAdapter extends PlatformAdapter {
       try {
         const parsed = JSON.parse(rawCookies);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed as Cookie[];
-      } catch {}
+      } catch { /* ignore */ }
     }
     if (Array.isArray(rawCookies) && rawCookies.length > 0) return rawCookies as Cookie[];
 
@@ -73,16 +84,27 @@ export class NeteaseApiAdapter extends PlatformAdapter {
     return [];
   }
 
-  private _ensureRuntime(cookies: Cookie[]): void {
-    this._runtime = new NodeRuntime(formatCookiesForRuntime(cookies), {
-      debug: this.options.debug,
-    });
+  private _createRuntime(cookies: Cookie[]): NodeRuntime {
+    return new NodeRuntime(formatCookiesForRuntime(cookies), { debug: this.options.debug });
   }
 
-  /**
-   * 检查登录态：GET 首页，看响应是否含登录后特征
-   * 网易号首页未登录会 302 到 passport.163.com
-   */
+  /** 用 navinfo.do 校验登录态并返回账号信息 */
+  private async _fetchAccount(runtime: NodeRuntime): Promise<{ account: NeteaseAccount | null; error?: string }> {
+    try {
+      const resp = await runtime.fetch(`${NAVINFO_URL}?_=${Date.now()}`, {
+        method: 'GET',
+        headers: { ...PAGE_HEADERS, Accept: 'application/json, text/plain, */*' },
+      });
+      const data = await resp.json() as any;
+      if (data?.code !== 1 || !data?.data?.tid) {
+        return { account: null, error: data?.msg || 'navinfo.do 未返回登录账号' };
+      }
+      return { account: data.data as NeteaseAccount };
+    } catch (err) {
+      return { account: null, error: (err as Error).message };
+    }
+  }
+
   async checkAuth(credentials: PlatformCredentials): Promise<{
     isAuthenticated: boolean;
     username?: string;
@@ -90,113 +112,133 @@ export class NeteaseApiAdapter extends PlatformAdapter {
     error?: string;
   }> {
     const cookies = await this._getCookies(credentials);
+    if (cookies.length === 0) return { isAuthenticated: false, error: '无可用 Cookie' };
+
+    const runtime = this._createRuntime(cookies);
+    const result = await this._fetchAccount(runtime);
+    if (!result.account) return { isAuthenticated: false, error: result.error };
+
+    return {
+      isAuthenticated: true,
+      userId: result.account.tid,
+      username: result.account.tname,
+    };
+  }
+
+  async publish(params: PublishParams): Promise<PublishResult> {
+    const cookies = await this._getCookies(params.credentials);
     if (cookies.length === 0) {
-      return { isAuthenticated: false, error: '无可用 Cookie' };
+      return { success: false, error: `无可用 Cookie。请为账号 ${params.credentials.accountId} 配置网易号 Cookie。` };
     }
-    this._ensureRuntime(cookies);
+
+    const runtime = this._createRuntime(cookies);
+    const auth = await this._fetchAccount(runtime);
+    if (!auth.account) return { success: false, error: `网易号未登录: ${auth.error}` };
+
+    const account = auth.account;
+    let ursToken = '';
+    if (this.options.ursTokenProvider) {
+      try {
+        ursToken = (await this.options.ursTokenProvider()) ?? '';
+      } catch (err) {
+        console.warn('[NeteaseApiAdapter] ursTokenProvider 失败:', err);
+      }
+    }
+
+    const html = await this._processImages(
+      runtime,
+      account.tid,
+      params.article.contentHtml || '',
+    );
+
+    const body = new URLSearchParams();
+    body.append('wemediaId', account.tid);
+    body.append('articleId', '-1');
+    body.append('title', params.article.title);
+    body.append('content', html);
+    body.append('cover', 'threeImg');
+    body.append('operation', 'saveDraft');
+    body.append('scheduled', '0');
+    body.append('ursToken', ursToken);
+    body.append('onlineState', '1');
+    body.append('picUrl', '');
+    body.append('original', '0');
+    body.append('subjectId', '');
+
+    const url = `${PUBLISH_URL}?_=${Date.now()}&wemediaId=${account.tid}`
+      + `&realUserId=${encodeURIComponent(account.realUserId || '')}`;
 
     try {
-      // NodeRuntime.fetch 不跟随重定向时，我们需要手动检查
-      // 由于 Node.js fetch 默认跟随重定向，我们用 response.url 判断最终落点
-      const resp = await this._runtime!.fetch(CHECK_AUTH_URL, {
-        method: 'GET',
-        redirect: 'follow',
+      const resp = await runtime.fetch(url, {
+        method: 'POST',
+        headers: {
+          ...PAGE_HEADERS,
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: body.toString(),
       });
-      const finalUrl = resp.url;
-      const text = await resp.text();
-
-      // 未登录：被重定向到 passport.163.com / login
-      if (finalUrl.includes('passport.163.com') || finalUrl.includes('login')) {
-        return { isAuthenticated: false, error: `被重定向到登录页: ${finalUrl}` };
-      }
-      // 未登录：响应里包含登录引导文案
-      if (text.includes('登录网易') || text.includes('请登录')) {
-        return { isAuthenticated: false, error: '响应包含登录引导文案' };
-      }
-      // 已登录：响应里包含编辑器入口或用户信息
-      // 这里只是启发式判断，具体特征需抓包确认
-      const hasAuthCookie = cookies.some(c =>
-        c.name === 'NTES_SESS' || c.name === 'P_INFO' || c.name === 'NTES_PASSPORT',
-      );
-      if (!hasAuthCookie) {
-        return { isAuthenticated: false, error: '缺少关键鉴权 Cookie (NTES_SESS/P_INFO/NTES_PASSPORT)' };
+      const data = await resp.json() as any;
+      if (data?.code !== 1) {
+        return {
+          success: false,
+          error: `网易号保存草稿失败: ${data?.msg || JSON.stringify(data).slice(0, 200)}`
+            + (ursToken ? '' : '（ursToken 为空，若为鉴权失败需通过 ursTokenProvider 注入）'),
+        };
       }
 
+      const docId = data.data
+        ? (new URLSearchParams(String(data.data)).get('docId') || String(data.data))
+        : '';
       return {
-        isAuthenticated: true,
-        username: 'netease-user', // TODO: 从响应解析真实用户名
+        success: true,
+        postId: docId,
+        postUrl: `https://mp.163.com/subscribe_v4/index.html#/article-publish/${docId}?option=editDraft`,
+        draftSaved: true,
+        verificationStatus: 'draft_saved',
+        verificationMessage: `网易号草稿已保存（账号: ${account.tname || account.tid}）`,
       };
     } catch (err) {
-      return { isAuthenticated: false, error: (err as Error).message };
+      return { success: false, error: `网易号保存草稿异常: ${(err as Error).message}` };
     }
   }
 
-  /**
-   * 保存草稿 —— ⚠️ 当前是占位实现，需要抓包补全
-   *
-   * 抓包步骤：
-   *   1. 浏览器登录 https://mp.163.com/#/article-publish
-   *   2. DevTools → Network → 过滤 XHR
-   *   3. 填写标题 + 正文，等约 60s 触发自动保存
-   *   4. 找到 POST 请求（大概率路径含 /api/ 或 /mp/media/）
-   *   5. 记录：URL / Method / Content-Type / Request Payload 字段名
-   *   6. 把字段填到下面的 buildDraftBody()
-   */
-  async publish(params: PublishParams): Promise<PublishResult> {
-    const auth = await this.checkAuth(params.credentials);
-    if (!auth.isAuthenticated) {
-      return { success: false, error: `网易号未登录: ${auth.error}` };
+  /** 把正文里的外链图片上传到网易号并替换为站内地址（失败保留原图） */
+  private async _processImages(runtime: NodeRuntime, wemediaId: string, html: string): Promise<string> {
+    if (!html) return html;
+    const matches = [...html.matchAll(/<img[^>]*?src=["']([^"']+)["'][^>]*>/gi)];
+    if (matches.length === 0) return html;
+
+    let out = html;
+    for (const m of matches) {
+      const src = m[1];
+      if (!src || src.startsWith('data:')) continue;
+      if (/126\.net|163\.com|netease\.com/.test(src)) continue;
+      try {
+        const uploaded = await this._uploadImage(runtime, wemediaId, src);
+        if (uploaded) out = out.split(m[0]).join(m[0].replace(src, uploaded));
+      } catch (err) {
+        console.warn(`[NeteaseApiAdapter] 图片上传失败，保留原图: ${src}`, err);
+      }
     }
+    return out;
+  }
 
-    // ⚠️ 占位实现：API 端点未抓包确认
-    return {
-      success: false,
-      error: [
-        '网易号 publish API 尚未实现（骨架适配器）。',
-        '原因：网易号编辑器是 React SPA + DraftJS，公开生态无 fetch API 逆向记录。',
-        '启用步骤：抓包 mp.163.com 编辑器自动保存 XHR → 填入 DRAFT_API_URL 和 buildDraftBody()。',
-        `占位 URL: ${DRAFT_API_URL}`,
-        '临时方案：保持现有 NeteaseRpaHandler 兜底（不要在 Publisher.createDefault 注册本 adapter）。',
-      ].join(' '),
-    };
+  private async _uploadImage(runtime: NodeRuntime, wemediaId: string, src: string): Promise<string | null> {
+    const imgResp = await fetch(src);
+    if (!imgResp.ok) return null;
+    const blob = await imgResp.blob();
 
-    // 抓包后启用以下模板：
-    /*
-    const article = params.article;
-    const body = this.buildDraftBody(article);
-    const resp = await this._runtime!.fetch(DRAFT_API_URL, {
+    const form = new FormData();
+    form.append('file', blob, 'image.jpg');
+
+    const resp = await runtime.fetch(`${UPLOAD_URL}?wemediaId=${wemediaId}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Origin': 'https://mp.163.com',
-        'Referer': 'https://mp.163.com/',
-      },
-      body: JSON.stringify(body),
+      headers: PAGE_HEADERS,
+      body: form as any,
     });
-    const res = await resp.json();
-    if (!res.success) {
-      return { success: false, error: res.msg ?? '草稿保存失败' };
-    }
-    return {
-      success: true,
-      postId: String(res.data),
-      postUrl: `https://mp.163.com/subscribe_v4/index.html#/article/${res.data}`,
-      draftSaved: true,
-      verificationStatus: 'draft_saved',
-      verificationMessage: '网易号草稿保存成功',
-    };
-    */
+    const data = await resp.json() as any;
+    if (data?.code !== 1 || !data?.data) return null;
+    return data.data.url || data.data.picUrl || null;
   }
-
-  /**
-   * 构建草稿请求体 —— 抓包后填充字段
-   */
-  // private buildDraftBody(article: Article): Record<string, unknown> {
-  //   return {
-  //     title: article.title,
-  //     content: article.contentHtml ?? '',
-  //     // TODO: 抓包补全 categoryId / summary / cover / tags 等字段
-  //   };
-  // }
 }

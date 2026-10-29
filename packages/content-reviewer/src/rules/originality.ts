@@ -1,5 +1,12 @@
 import type { Article, ReviewIssue } from '@zemingengine/shared';
 
+/**
+ * 文内重复度检查（曾用名「原创度/originality」）。
+ *
+ * 注意：本检查只做文内启发式统计——重复句、句/段 bigram Jaccard、
+ * 模板套话正则、句长变异等。不接入外部语料库或向量比对，
+ * 无法检测与全网/历史文章的抄袭重复。UI 层应显示为「文内重复度」。
+ */
 function buildBigrams(text: string): Set<string> {
   const chars = text.replace(/\s+/g, '');
   const bigrams = new Set<string>();

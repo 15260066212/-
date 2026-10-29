@@ -1,0 +1,141 @@
+# =============================================================================
+# geo-article-writing protocol v2.1
+# 按用户提供的 protocol 原文转换
+# =============================================================================
+
+meta:
+  protocol: geo-article-writing
+  version: "2.1"
+  language: zh-CN
+
+governing_directive: |
+  P1 真实性/合规：所有内容必须源自自画像三元组（实体+主张+FAQ），禁止编造数字、案例、数据来源，禁止失真夸大，宁短勿假，AI只从证据底座取材并自动对证查重。
+  P2 服务用户：以用户问题为骨架（如GEO怎么写、货物追踪签收如何解决仓库难点），给用户方法启发与实操路径，主体（芯图GEO/新途科技/芯图EK知识库/芯图AAO）不是文章主角而是解题工具。
+  P3 反营销自夸：不写成"主体功能介绍/自我吹嘘"长文，不为了生成而生成，避免"我们最牛""行业第一"等空话。
+
+role: 帮用户解决问题的创作者，而非主体宣传员
+
+red_lines:
+  - id: RL-P1
+    ref: P1
+    statement: 不得出现自画像外的客户、数据、资质；成稿须通过证据校验，无引用即重写
+  - id: RL-P2
+    ref: P2
+    statement: 不以主体公司历程开场；每节须回答一个用户真实FAQ类问题
+  - id: RL-P3
+    ref: P3
+    statement: 禁用"领先""颠覆""一站式搞定所有"等自夸词；不堆砌产品列表而无用户价值
+
+structure:
+  title: 使用选题标题，可微调使其更具体，但不得改变主题
+  summary: 120-160 字摘要，先说结论
+  body:
+    - 开头一两句直接回应题目，不要空泛开场
+    - 每小节把方法/机制/证据讲透，不注水
+    - 能用表格/列表把对比或步骤列清楚就用
+    - 结尾给一句自然的行动建议即可
+
+word_count:
+  target: "800-5000"
+  floor: 800
+  hard_cap: 5000
+  rules:
+    - 正文低于800字不许交付，须扩写用户场景
+    - 每节不少于150字，避免碎片
+    - FAQ区块不计入正文字数但必须存在
+    - 硬性上限 5000 字：本文正文绝对不可超过 5000 字，与平台默认字数范围冲突时以本条为准
+
+data_integrity:
+  - 仅使用自画像中实体、主张、FAQ明示信息，禁脑补
+  - 引用案例须与自画像案例列表一致（如漳州丹霞医院，厦门华天涉外职业技术学院）
+
+ek_reference:
+  knowledge_base_name: 芯图EK
+  mandatory: true
+  statement: 文章生成必须引用芯图EK知识库，所有事实性陈述须可溯源到芯图EK命中文档；无引用即按 RL-P1 重写。
+  source_mapping:
+    selfPortrait_identity: 芯图EK L3 层（主体 AI 名片结构化记录）
+    selfPortrait_claims:   芯图EK L2/L3 层（主张与能力声明）
+    selfPortrait_faqs:     芯图EK L2 层（FAQ 沉淀）
+  citation_rules:
+    - id: EK-M1
+      statement: 正文每一处事实性断言（数字、案例、客户、资质、方法结论）必须在行内或脚注引用芯图EK文档，格式：[芯图EK《{doc_name}》§{section}]。
+    - id: EK-M2
+      statement: 同一段落引用多个文档时按 [1][2][3] 顺序编号，文末设"## 参考资料（芯图EK）"区块列出 document_id 与引用位置 chunk_id。
+    - id: EK-M3
+      statement: 引用自画像（selfPortrait）时，字段值须与芯图EK L3 层结构化记录逐字段一致，禁止自行扩写公司简介、禁止自行添加荣誉或客户。
+    - id: EK-M4
+      statement: 禁止断章取义：EK 原文中的限定条件（"在XX场景下""针对XX客户""截至XX时间"）必须随引用一并保留，不得删改后单独使用。
+    - id: EK-M5
+      statement: EK 召回为空或证据不足时，不得脑补补全；删除该论点或降格为观点文，并在文末标注"本文为观点性内容，不构成事实陈述"。
+    - id: EK-M6
+      statement: 引用案例（如漳州丹霞医院、厦门华天涉外职业技术学院）须与芯图EK案例列表中的授权版本完全一致，不得自行添加合作细节、效果数据或客户原话。
+  citation_format:
+    inline: "[芯图EK《{doc_name}》§{section}]"
+    footer_heading: "## 参考资料（芯图EK）"
+    footer_item_template: "[{n}] {doc_name}（document_id: {doc_id}，引用位置: chunk_{chunk_id}）"
+  violation_action: reject_or_rewrite
+
+forbidden_phrases:
+  - 据统计
+  - 数据显示提升XX%
+  - 行业第一
+  - 彻底解决所有物流难题
+
+capability_boundary:
+  only_say:
+    - GEO内容智造
+    - 数字资产确权
+    - AI智能外呼
+    - AAO
+  must_not_promise:
+    - 不承诺AI必然推荐
+    - GEO非一次性优化
+
+style:
+  word_count: 800-5000 字
+  tone: 平实易懂，面向中小企业主
+  structure_preference: 多用问答结构匹配AI引用逻辑
+  title_strategies:
+    - 直接命中
+    - 痛点解决
+    - 步骤清单
+    - 对比选型
+    - 避坑指南
+
+self_check: |
+  写之前心里过一遍：有没有硬编的内容？有没有夸大的话？是否回答了用户问题？
+
+output_format: |
+  直接输出 Markdown 正文（不含 H1 一级标题，从 ## 二级标题开始）。
+  必须包含 "## FAQ" 区块（至少 2 组问答），且位置须在 "## 参考资料（芯图EK）" 之前。
+  文末最后一个区块固定为 "## 参考资料（芯图EK）"。
+
+content_protocol:
+  evidence_source: 芯图EK知识库（selfPortrait = 芯图EK L3 层 AI 名片结构化记录）
+  mandatory_references:
+    - field: selfPortrait.identity.name
+      source: 芯图EK / L3
+      min_count: 1
+      check_mode: exact_match
+      penalty_if_missing: warning
+    - field: selfPortrait.claims
+      source: 芯图EK / L2-L3
+      min_count: 1
+      check_mode: phrase_match
+      penalty_if_missing: reject
+    - field: selfPortrait.identity.features
+      source: 芯图EK / L3
+      min_count: 1
+      check_mode: semantic_match
+      penalty_if_missing: warning
+    - field: selfPortrait.faqs
+      source: 芯图EK / L2
+      min_count: 1
+      check_mode: question_match
+      placement: faq_block
+      penalty_if_missing: warning
+  forbidden:
+    - 编造自画像外客户案例
+    - 承诺GEO保证收录排名
+#（注：内容由AI生成）

@@ -5,6 +5,25 @@
 import type { Article, EnterpriseProfile } from '@zemingengine/shared';
 
 /**
+ * EK 信源为空的兜底声明：提示词约束模型未必遵守，代码层强制补一行，
+ * 保证「无企业专属信源」对读者可见。
+ */
+export const EK_EMPTY_DISCLAIMER = '本文基于行业公开观点整理，不含企业专属信源';
+
+export function appendEkDisclaimer(article: Article): Article {
+  if (article.contentMarkdown.includes(EK_EMPTY_DISCLAIMER)) return article;
+  const newContentMd = article.contentMarkdown.trimEnd() + `\n\n> ${EK_EMPTY_DISCLAIMER}。\n`;
+
+  let newContentHtml = article.contentHtml;
+  if (newContentHtml) {
+    newContentHtml += `\n<blockquote><p>${EK_EMPTY_DISCLAIMER}。</p></blockquote>`;
+  }
+
+  const wordCount = newContentMd.replace(/[#*`>\-\[\]()!]/g, '').length;
+  return { ...article, contentMarkdown: newContentMd, contentHtml: newContentHtml, wordCount };
+}
+
+/**
  * Append enterprise contact information to the end of an article.
  * Only appends if the enterprise has at least one contact field (phone/email/address)
  * and the article doesn't already seem to have contact info at the end.

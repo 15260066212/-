@@ -9,8 +9,9 @@ import {
   upsertCredential,
   deleteCredential,
   getAllCredentials,
-  MAIN_SERVER_URL,
+  mainServerClient,
 } from '../config/index.js';
+import { createCookieCredential } from '../lib/credential-model.js';
 import { PLATFORM_URLS, PLATFORM_NAMES } from '../config/platforms.js';
 import type { Express, Request, Response } from 'express';
 
@@ -117,46 +118,36 @@ export function registerInfoRoutes(app: Express): void {
 
   /**
    * POST /api/credentials/sync
+   *
+   * 把本地全部 Cookie 凭据推送到主 server。
+   * 走 POST /api/credentials/sync（带 accountId 的 ACL 接口）；
+   * 旧实现用 PUT /api/credentials/{key}，key 形如 `default:csdn` 会被主 server 判为非法平台名。
    */
   app.post('/api/credentials/sync', async (req: Request, res: Response) => {
     try {
       const creds = getAllCredentials();
-      const results: Array<{ platform: string; success: boolean; error?: string }> = [];
+      const payloads = Object.values(creds)
+        .filter((cred) => cred.data?.cookie)
+        .map((cred) =>
+          createCookieCredential({
+            platform: cred.platform,
+            platformName: cred.platformName || PLATFORM_NAMES[cred.platform],
+            accountName: cred.accountName || 'default',
+            cookie: cred.data!.cookie,
+            cookieCount: cred.cookieCount || 0,
+            status: (cred.status as 'active' | 'expired' | 'invalid') || 'active',
+          }),
+        );
 
-      for (const [platform, cred] of Object.entries(creds)) {
-        if (!cred.data || !cred.data.cookie) {
-          results.push({ platform, success: false, error: 'No cookie data' });
-          continue;
-        }
+      const missing = Object.values(creds)
+        .filter((cred) => !cred.data?.cookie)
+        .map((cred) => ({ platform: cred.platform, success: false, error: 'No cookie data' }));
 
-        const payload = {
-          platform,
-          type: 'cookie',
-          data: { cookie: cred.data.cookie },
-          status: cred.status || 'active',
-        };
-
-        try {
-          const resp = await fetch(`${MAIN_SERVER_URL}/api/credentials/${platform}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-
-          if (resp.ok) {
-            results.push({ platform, success: true });
-            console.log(`[Sync] Synced ${platform} credentials to main server`);
-          } else {
-            const text = await resp.text();
-            results.push({ platform, success: false, error: `Server ${resp.status}: ${text}` });
-          }
-        } catch (e: unknown) {
-          const err = e as Error;
-          results.push({ platform, success: false, error: err.message });
-        }
-      }
-
+      const result = await mainServerClient.syncAllCredentials(payloads);
+      const results = [...result.results, ...missing];
       const succeeded = results.filter((r) => r.success).length;
+
+      console.log(`[Sync] ${succeeded}/${results.length} credentials synced to main server`);
       res.json({ success: true, synced: succeeded, total: results.length, results });
     } catch (error: unknown) {
       const err = error as Error;

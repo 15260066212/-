@@ -107,8 +107,8 @@ export function filterDueTasks(tasks: PublishTask[], now: number): PublishTask[]
   return tasks.filter(
     (t) =>
       (t.status === 'pending' || t.status === 'retrying') &&
-      !!t.scheduledAt &&
-      new Date(t.scheduledAt).getTime() <= now,
+      // 无 scheduledAt 视为立即任务（历史遗留任务 scheduled_at 为 NULL，否则永久卡死）
+      (!t.scheduledAt || new Date(t.scheduledAt).getTime() <= now),
   );
 }
 

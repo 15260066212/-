@@ -36,12 +36,14 @@ structure:
     - 结尾给一句自然的行动建议即可
 
 word_count:
-  target: "800-1500"
+  target: "800-5000"
   floor: 800
+  hard_cap: 5000
   rules:
     - 正文低于800字不许交付，须扩写用户场景
     - 每节不少于150字，避免碎片
     - FAQ区块不计入正文字数但必须存在
+    - 硬性上限 5000 字：本文正文绝对不可超过 5000 字，与平台默认字数范围冲突时以本条为准
 
 data_integrity:
   - 仅使用自画像中实体、主张、FAQ明示信息，禁脑补
@@ -91,7 +93,7 @@ capability_boundary:
     - GEO非一次性优化
 
 style:
-  word_count: 800-1500 字
+  word_count: 800-5000 字
   tone: 平实易懂，面向中小企业主
   structure_preference: 多用问答结构匹配AI引用逻辑
   title_strategies:

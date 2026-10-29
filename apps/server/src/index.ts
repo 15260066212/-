@@ -88,7 +88,20 @@ async function executePlanTask(db: DatabaseAccess, task: any): Promise<void> {
     db.articles.updateArticle(result.article.id, { status: 'approved' });
     // 审核通过后回写信源引用计数（与 /generate 一致）
     if (citedSources.length > 0) {
-      updateSession(task.session_id, recordSourceUsage(session, citedSources.map((s) => s.id)), db);
+      const bumped = recordSourceUsage(session, citedSources.map((s) => s.id));
+      updateSession(task.session_id, bumped, db);
+      // 同步 usageCount 到 Milvus（与 /generate 一致），避免定时任务链路导致引用分布漂移
+      if (db.milvus) {
+        const sourceMap = new Map((bumped.knowledgeBase.sources ?? []).map((s) => [s.id, s]));
+        for (const src of citedSources) {
+          const bump = sourceMap.get(src.id);
+          if (bump) {
+            db.milvus.updateUsageCount(src.id, bump.usageCount).catch((e: unknown) =>
+              console.warn('[PlanScheduler] Milvus updateUsageCount 失败:', e instanceof Error ? e.message : e),
+            );
+          }
+        }
+      }
     }
   } else {
     db.articles.updateArticle(result.article.id, { status: 'reviewing' });

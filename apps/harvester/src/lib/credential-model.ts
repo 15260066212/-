@@ -1,3 +1,5 @@
+import { listAllPlatforms } from '@zemingengine/shared';
+
 /**
  * Cookie credential data structure - unified across harvester local storage and main server sync.
  */
@@ -42,6 +44,40 @@ export function createCookieCredential(params: {
 }
 
 /**
+ * harvester 平台名 → 主库 PlatformId 映射（sohuhao → sohu、wangyihao → netease…）。
+ * 若不转换，主库会存成 harvester 名字，而发布侧按 PlatformId 查凭证，永远查不到。
+ */
+const HARVESTER_TO_PLATFORM_ID: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const p of listAllPlatforms()) {
+    if (p.harvesterName) map[p.harvesterName] = p.id;
+  }
+  return map;
+})();
+
+export function toPlatformId(harvesterPlatform: string): string {
+  return HARVESTER_TO_PLATFORM_ID[harvesterPlatform] ?? harvesterPlatform;
+}
+
+/** 反向映射：主库 PlatformId → harvester 平台名（toutiao → toutiaohao）。 */
+const PLATFORM_ID_TO_HARVESTER: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const p of listAllPlatforms()) {
+    if (p.harvesterName) map[p.id] = p.harvesterName;
+  }
+  return map;
+})();
+
+/**
+ * 主库/发布侧传进来的 PlatformId 转回 harvester 平台名。
+ * 主库已统一存 PlatformId，而 harvester 路由（refresh-cookies/check-session）
+ * 以及本地凭证 key 仍以 harvesterName 为准，所以入口需要转换。
+ */
+export function toHarvesterName(platformId: string): string {
+  return PLATFORM_ID_TO_HARVESTER[platformId] ?? platformId;
+}
+
+/**
  * Builds a sync payload for the main server from a CookieCredential.
  * Encapsulates the mapping between local credential model and server API format.
  */
@@ -55,7 +91,7 @@ export function buildSyncPayload(cred: CookieCredential): {
   status: string;
 } {
   return {
-    platform: cred.platform,
+    platform: toPlatformId(cred.platform),
     platformName: cred.platformName,
     accountId: cred.accountName,
     accountName: cred.accountName,

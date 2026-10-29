@@ -5,21 +5,10 @@ import { PublishDefaults } from './constants.js';
 import { PlatformAdapter } from './adapters/base.js';
 import { WechatAdapter, WechatSyncCoreAdapter } from './adapters/index.js';
 import { ToutiaoApiAdapter } from './adapters/toutiao-api.js';
+import { NeteaseApiAdapter } from './adapters/netease-api.js';
 import { exportCookiesFromChrome } from './cookie-exporter.js';
 import { RPAEngine } from './rpa-engine.js';
-import { RpaHandler } from './rpa-handlers/base.js';
-import {
-  CsdnRpaHandler,
-  ZhihuRpaHandler,
-  JuejinRpaHandler,
-  ToutiaoRpaHandler,
-  SohuRpaHandler,
-  NeteaseRpaHandler,
-} from './rpa-handlers/index.js';
-// 注意：NeteaseApiAdapter 已存在但**故意不注册**——它是占位骨架，
-// publish 需要抓包补全。注册会抢占 NeteaseRpaHandler 的 RPA fallback。
-// 抓包完成后，把下面注释取消即可：
-// import { NeteaseApiAdapter } from './adapters/netease-api.js';
+import type { RpaHandler } from './rpa-handlers/base.js';
 
 /** Callback for writing publish log entries to DB or elsewhere. */
 export type LogCallback = (entry: {
@@ -59,28 +48,19 @@ export class Publisher {
 
     // === WechatSync Core API-based platforms (纯 Node.js fetch + Cookie，零 Chromium) ===
     // Cookie 通过 exportCookiesFromChrome 从 harvester 的 Chrome profile 导出
-    // 优先级高于 RPA handler（publishArticle 里 getMethod() === 'api' 走 adapter）
     const coreCookiesProvider = exportCookiesFromChrome;
     pub.registerAdapter(new WechatSyncCoreAdapter('csdn',    { cookiesProvider: coreCookiesProvider, debug: true }));
     pub.registerAdapter(new WechatSyncCoreAdapter('juejin',  { cookiesProvider: coreCookiesProvider, debug: true }));
     pub.registerAdapter(new WechatSyncCoreAdapter('zhihu',   { cookiesProvider: coreCookiesProvider, debug: true }));
     pub.registerAdapter(new WechatSyncCoreAdapter('sohu',    { cookiesProvider: coreCookiesProvider, debug: true }));
     // 头条：独立 API 适配器（来源: wechatsync git 历史 + v1 driver）
-    // 默认存草稿（save=1）。若返回 err_no=7050（缺 msToken/a_bogus 签名），退回 RPA。
+    // 默认存草稿（save=1）。若返回 err_no=7050（缺 msToken/a_bogus 签名），任务失败。
     pub.registerAdapter(new ToutiaoApiAdapter({ cookiesProvider: coreCookiesProvider, debug: true }));
-    // 注意：NeteaseApiAdapter 故意不注册——它是占位骨架（publish 未抓包补全）。
-    // netease 继续走 NeteaseRpaHandler。抓包完成后取消下面注释：
-    // pub.registerAdapter(new NeteaseApiAdapter({ cookiesProvider: coreCookiesProvider, debug: true }));
+    // 网易号：按 WechatSync 扩展包内 NeteaseAdapter 的站内接口实现（navinfo.do + publishV2.do）
+    pub.registerAdapter(new NeteaseApiAdapter({ cookiesProvider: coreCookiesProvider, debug: true }));
 
-    // === RPA-based platforms ===
-    // 注意：CSDN/掘金/知乎 虽然也注册了 RPA handler，但 WechatSyncCoreAdapter (API) 优先。
-    // RPA handler 仅在 WechatSyncCoreAdapter 不可用时（如 dist 加载失败）作为 fallback。
-    pub.registerRpaHandler(new CsdnRpaHandler());
-    pub.registerRpaHandler(new ZhihuRpaHandler());
-    pub.registerRpaHandler(new JuejinRpaHandler());
-    pub.registerRpaHandler(new ToutiaoRpaHandler());
-    pub.registerRpaHandler(new SohuRpaHandler());
-    pub.registerRpaHandler(new NeteaseRpaHandler());
+    // RPA handler 已全部移除：发布仅走 API 适配器，无浏览器兜底。
+    // 受影响平台：csdn/juejin/zhihu/sohu/toutiao/netease 失去降级路径。
 
     return pub;
   }

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { DatabaseAccess } from '../db.js';
+import type { AppEnv, DatabaseAccess } from '../db.js';
 import type { ReloginManager } from '../session-health/relogin-manager.js';
 import type { SelectorMonitor } from '../session-health/selector-monitor.js';
 import type { CaptchaManager } from '../session-health/captcha-manager.js';
@@ -12,13 +12,17 @@ export function createMonitorRoutes(
   selectorMonitor: SelectorMonitor,
   _captchaManager: CaptchaManager,
 ) {
-  const app = new Hono();
+  const app = new Hono<AppEnv>();
 
   app.get('/overview', (c) => {
     try {
       const articles = db.articles.getArticlesByStatuses(['draft', 'reviewing', 'approved', 'published', 'failed']);
       const publishTasks = db.publish.getPublishTasksByStatuses(['pending', 'publishing', 'published', 'failed', 'retrying']);
-      const sessions = db.sessions.getSessionsByUser('user_default');
+      // 管理员统计全部会话，普通用户只统计自己的
+      const user = c.get('user') as { id?: string; role?: string } | undefined;
+      const sessions = user?.role === 'admin'
+        ? db.sessions.getAllSessions()
+        : db.sessions.getSessionsByUser(user?.id ?? 'user_default');
       const recentLogs = db.publish.getRecentPublishLogs(20);
 
       const published = articles.filter((a) => a.status === 'published').length;

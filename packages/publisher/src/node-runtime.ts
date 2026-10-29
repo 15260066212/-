@@ -57,6 +57,27 @@ export function formatCookiesForRuntime(rawCookies: Cookie[]): Record<string, Co
   return byDomain;
 }
 
+/**
+ * 把主库凭证里的 Cookie 头字符串（`a=1; b=2`）还原成 Cookie 数组。
+ * 主库只存 cookie 字符串（丢失 domain/path），需要调用方按平台域名回填，
+ * 这样 NodeRuntime 才能按域名匹配到 Cookie，且每个账号各用各的凭证不会串号。
+ */
+export function parseCookieHeader(header: string, domain: string): Cookie[] {
+  const cookies: Cookie[] = [];
+  if (!header || !domain) return cookies;
+  for (const part of header.split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const name = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim();
+    if (!name) continue;
+    cookies.push({ name, value, domain, path: '/', secure: true, httpOnly: false });
+  }
+  return cookies;
+}
+
 export class NodeRuntime {
   readonly type = 'node';
   readonly userAgent: string;

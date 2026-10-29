@@ -18,6 +18,9 @@ const PLATFORM_REQUIREMENTS: Record<PlatformId, {
   juejin: { minWordCount: 500, maxWordCount: 50000, maxTags: 5, minTags: 1, titleMaxLength: 100, needsCoverImage: false, contentFormat: 'markdown', notes: '掘金' },
   sohu: { minWordCount: 400, maxWordCount: 30000, maxTags: 5, minTags: 1, titleMaxLength: 50, needsCoverImage: false, contentFormat: 'html', notes: '搜狐号' },
   netease: { minWordCount: 400, maxWordCount: 30000, maxTags: 5, minTags: 1, titleMaxLength: 50, needsCoverImage: false, contentFormat: 'html', notes: '网易号' },
+  baijia: { minWordCount: 400, maxWordCount: 30000, maxTags: 5, minTags: 1, titleMaxLength: 40, needsCoverImage: false, contentFormat: 'html', notes: '百家号' },
+  bilibili: { minWordCount: 300, maxWordCount: 20000, maxTags: 10, minTags: 1, titleMaxLength: 80, needsCoverImage: false, contentFormat: 'markdown', notes: '哔哩哔哩专栏' },
+  zhidao: { minWordCount: 200, maxWordCount: 10000, maxTags: 5, minTags: 1, titleMaxLength: 50, needsCoverImage: false, contentFormat: 'plain', notes: '百度知道' },
 };
 
 const PLATFORM_TABOO_WORDS: Partial<Record<PlatformId, string[]>> = {

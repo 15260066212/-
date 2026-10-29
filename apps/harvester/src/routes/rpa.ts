@@ -20,6 +20,7 @@ import {
   getProxyOptions,
 } from '../config/index.js';
 import { injectStealth } from '../lib/stealth.js';
+import { toHarvesterName } from '../lib/credential-model.js';
 import {
   PLATFORM_URLS,
   PLATFORM_NAMES,
@@ -49,7 +50,8 @@ export function registerRpaRoutes(app: Express): void {
    * Returns: { success: boolean, cookies?: string, cookieCount?: number, error?: string }
    */
   app.post('/api/rpa/refresh-cookies', async (req: Request, res: Response) => {
-    const { platform, cookies: cookieString, storageState, fingerprintData } = req.body;
+    const { platform: rawPlatform, cookies: cookieString, storageState, fingerprintData } = req.body;
+    const platform = toHarvesterName(rawPlatform);
 
     if (!platform || !PLATFORM_URLS[platform]) {
       return res.status(400).json({
@@ -237,7 +239,7 @@ export function registerRpaRoutes(app: Express): void {
    * Body: { platform: string }
    */
   app.post('/api/rpa/check-session', async (req: Request, res: Response) => {
-    const { platform } = req.body;
+    const platform = toHarvesterName(req.body.platform);
 
     if (!platform) {
       return res.status(400).json({ success: false, error: 'Platform is required' });
@@ -264,6 +266,7 @@ export function registerRpaRoutes(app: Express): void {
       success: true,
       platform,
       status: cred.status || 'unknown',
+      valid: cred.status === 'active' && cred.cookieCount > 0,
       cookieCount: cred.cookieCount || 0,
       lastValidatedAt: cred.lastValidatedAt,
       hoursSinceValidation,
@@ -280,7 +283,8 @@ export function registerRpaRoutes(app: Express): void {
    * Body: { platform: string, username?: string, password?: string }
    */
   app.post('/api/rpa/relogin', async (req: Request, res: Response) => {
-    const { platform, username, password } = req.body;
+    const { username, password } = req.body;
+    const platform = toHarvesterName(req.body.platform);
 
     if (!platform) {
       return res.status(400).json({ success: false, error: 'Platform is required' });

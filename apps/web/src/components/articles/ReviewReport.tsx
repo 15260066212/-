@@ -13,7 +13,7 @@ const DIMENSION_LABELS: Record<ReviewDimension, string> = {
   quality: '内容质量',
   seo: 'SEO 优化',
   brand: '品牌一致性',
-  originality: '原创性',
+  originality: '文内重复度',
   platform_adaptation: '平台适配',
   readability: '可读性',
   safety: '安全性',

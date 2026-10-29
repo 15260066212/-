@@ -28,11 +28,20 @@ const DEFAULT_PROFILE_MAP: Partial<Record<string, string[]>> = {
 export function resolveProfileDir(
   platform: string,
   options: CookieExporterOptions = {},
+  accountName?: string,
 ): string | null {
   const base = options.profileBase ?? DEFAULT_PROFILE_BASE;
   const map = options.profileMap ?? DEFAULT_PROFILE_MAP;
 
-  // 1. 显式映射
+  // 0. 多账号：只允许使用该账号专属 profile（chrome-<accountName>-<platform>）。
+  //    找不到就返回 null，绝不回退到平台下的任意 profile，
+  //    否则 A 账号的 Cookie 会被拿去给 B 账号发布，文章会串到 A 的草稿箱。
+  if (accountName && accountName !== 'default') {
+    const exact = `${base}/chrome-${accountName}-${platform}`;
+    return existsSync(exact) ? exact : null;
+  }
+
+  // 1. 显式映射（单账号/默认账号）
   const candidates = map[platform] ?? [];
   for (const name of candidates) {
     const p = `${base}/${name}`;
@@ -51,12 +60,14 @@ export function resolveProfileDir(
 
 export async function exportCookiesFromChrome(
   platform: PlatformId | string,
-  _credentials?: PlatformCredentials,
+  credentials?: PlatformCredentials,
   options: CookieExporterOptions = {},
 ): Promise<Cookie[]> {
-  const profileDir = resolveProfileDir(String(platform), options);
+  const accountName = credentials?.accountName;
+  const profileDir = resolveProfileDir(String(platform), options, accountName);
   if (!profileDir) {
-    throw new Error(`找不到 ${platform} 的 Chrome profile 目录（base=${options.profileBase ?? DEFAULT_PROFILE_BASE}）`);
+    const who = accountName && accountName !== 'default' ? `账号 ${accountName} 的` : '';
+    throw new Error(`找不到 ${who}${platform} 专属 Chrome profile 目录（base=${options.profileBase ?? DEFAULT_PROFILE_BASE}）。为避免把文章发到其他账号的草稿箱，不会回退使用其他 profile。`);
   }
 
   const pwPath = options.playwrightImportPath ?? DEFAULT_PW_IMPORT;

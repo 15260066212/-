@@ -14,6 +14,8 @@ import { adaptForPlatform, countWords } from './platform-adapter.js';
 import { buildContentByType, buildTitleByType, buildSummaryText, type TemplateParams } from './fallback-templates.js';
 
 export const FALLBACK_MODEL_ID = 'fallback-template-v2';
+/** 协议硬性上限：正文（不含 FAQ 和 参考资料）不得超过 5000 字 */
+const PROTOCOL_HARD_CAP = 5000;
 
 /**
  * Robust JSON extraction from LLM response.
@@ -456,6 +458,106 @@ export function enforceCitationCoverage(content: string, sources: KnowledgeSourc
   return `${content}\n\n### 信源依据\n\n${lines.join('\n')}`;
 }
 
+/**
+ * 协议硬性字数截断：保证正文（不含 FAQ 和 参考资料）不超过 PROTOCOL_HARD_CAP。
+ *
+ * 策略：按 Markdown "##" 二级标题切割为小节，逐节累计字数，超过 cap 即停。
+ * FAQ / 参考资料 区块按标题识别，完整追加到末尾不计入 cap。
+ * 截断点始终在小节边界，不会产生半截段落。
+ */
+export function trimToWordCap(content: string, hardCap = PROTOCOL_HARD_CAP): string {
+  const totalWords = countWords(content);
+  if (totalWords <= hardCap + 200) return content; // 余量 200 字，避免反复触发
+
+  const FOOTER_PATTERNS = [/^##\s*FAQ/i, /^##\s*常见问题/i, /^##\s*参考资料/i, /^##\s*引用文献/i];
+  const sections: { heading: string; body: string; isFooter: boolean }[] = [];
+
+  // 按 "## " 切分，每个小节包括标题行 + 正文
+  const parts = content.split(/(?=^##\s)/m);
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const headingMatch = trimmed.match(/^##\s+(.+)/);
+    const heading = headingMatch ? headingMatch[1].trim() : '';
+    const isFooter = FOOTER_PATTERNS.some((re) => re.test(trimmed));
+    sections.push({ heading, body: part, isFooter });
+  }
+
+  const bodySections = sections.filter((s) => !s.isFooter);
+  const footerSections = sections.filter((s) => s.isFooter);
+
+  let accumulated = '';
+  let accumulatedWords = 0;
+  for (const sec of bodySections) {
+    const secWords = countWords(sec.body);
+    if (accumulatedWords + secWords <= hardCap) {
+      accumulated += (accumulated ? '\n\n' : '') + sec.body.trim();
+      accumulatedWords += secWords;
+    } else {
+      // 单独一个小节就超 cap —— 截断该小节正文到剩余预算
+      const remainingBudget = hardCap - accumulatedWords;
+      if (remainingBudget > 150) {
+        const trimmedBody = trimSectionBody(sec.body, remainingBudget);
+        accumulated += (accumulated ? '\n\n' : '') + trimmedBody;
+      }
+      break;
+    }
+  }
+
+  // 追加完整 footer 区块
+  const footer = footerSections.map((s) => s.body.trim()).join('\n\n');
+  const result = accumulated && footer ? `${accumulated}\n\n${footer}` : (accumulated || footer);
+
+  return result || content; // 极端情况兜底返回原文
+}
+
+/**
+ * 从完整内容里剥离 FAQ / 参考资料 等 footer 区块，返回纯正文。
+ * 用于 wordCount 计算，因为协议规定 FAQ 不计入正文字数。
+ */
+function stripFooterSections(content: string): string {
+  const FOOTER_PATTERNS = [/^##\s*FAQ/i, /^##\s*常见问题/i, /^##\s*参考资料/i, /^##\s*引用文献/i];
+  const parts = content.split(/(?=^##\s)/m);
+  const body: string[] = [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    if (FOOTER_PATTERNS.some((re) => re.test(trimmed))) continue;
+    body.push(trimmed);
+  }
+  return body.join('\n\n');
+}
+
+/**
+ * 截断单个小节正文到指定字数预算，优先保持段落边界。
+ * 先按段落累加，段落超预算再按字符硬切到预算内。
+ */
+function trimSectionBody(section: string, budget: number): string {
+  const lines = section.split('\n');
+  const headingLine = lines.find((l) => /^##\s/.test(l)) || '';
+  const bodyLines = lines.filter((l) => l !== headingLine);
+
+  let budgetUsed = 0;
+  const keptLines: string[] = [];
+
+  for (const line of bodyLines) {
+    const lineWords = countWords(line);
+    if (budgetUsed + lineWords <= budget) {
+      keptLines.push(line);
+      budgetUsed += lineWords;
+    } else if (budgetUsed === 0 && lineWords > budget) {
+      // 第一行就超 —— 按字符硬切
+      keptLines.push(line.slice(0, Math.ceil(budget * 1.5)) + '…');
+      break;
+    } else {
+      break;
+    }
+  }
+
+  const trimmed = [headingLine, ...keptLines].filter(Boolean).join('\n').trim();
+  return trimmed || section;
+}
+
 export class ContentGenerator {
   constructor(private options: { fallbackMode?: boolean } = {}) {}
 
@@ -501,8 +603,10 @@ export class ContentGenerator {
 
       // 引用落地校验：确保 L3 名片与所有选中信源在正文中真实出现
       const covered = enforceCitationCoverage(parsed.content, request.citedSources ?? []);
-      const adapted = adaptForPlatform(request.platform, covered);
-      const wordCount = countWords(covered);
+      // 协议硬性截断：正文（不含 FAQ 和 参考资料）不得超过 1500 字
+      const trimmed = trimToWordCap(covered);
+      const adapted = adaptForPlatform(request.platform, trimmed);
+      const wordCount = countWords(stripFooterSections(trimmed));
       const now = new Date().toISOString();
 
       const article: Article = {
@@ -608,8 +712,10 @@ export class ContentGenerator {
       tags = improved.tags;
     }
 
+    // 协议硬性截断：正文（不含 FAQ 和 参考资料）不得超过 1500 字
+    content = trimToWordCap(content);
     const adapted = adaptForPlatform(request.platform, content);
-    const wordCount = countWords(content);
+    const wordCount = countWords(stripFooterSections(content));
     const now = new Date().toISOString();
 
     const article: Article = {

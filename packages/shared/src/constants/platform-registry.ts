@@ -249,7 +249,9 @@ const REGISTRY: Partial<Record<PlatformId, PlatformInfo>> = {
     loginRedirectPatterns: ['login', 'passport.sohu.com'],
     loginTexts: ['登录搜狐', '请登录'],
     loggedInSelectors: ['.mp-sohu', '.home-container'],
-    authCookieNames: ['SUV', 'IPLOC'],
+    // 只放登录后才出现的 passport Cookie。
+    // SUV/IPLOC 是游客身份 + 地域 Cookie，匿名访问首页就会下发，会造成「未登录也判定已登录」。
+    authCookieNames: ['ppinf', 'pprdig', 'passport'],
     capabilities: {
       hasTags: false,
       hasCategory: true,

@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@zemingengine/shared": "file:../shared",
-    "@zemingengine/ai-engine": "file:../ai-engine"
+    "@zemingengine/ai-engine": "file:../ai-engine",
+    "js-yaml": "^4.3.0"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

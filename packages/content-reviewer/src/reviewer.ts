@@ -15,6 +15,8 @@ import { checkPlatformAdaptation } from './rules/platform-adaptation.js';
 import { checkReadability } from './rules/readability.js';
 import { checkSafety } from './rules/safety.js';
 import { checkTruthfulness } from './rules/truthfulness.js';
+import { checkGeoProtocol } from './rules/geo-protocol.js';
+import { loadProtocolConfig, type GeoProtocolConfig } from './protocol/protocol-config.js';
 import { calculateScore, calculateWeightedScore } from './scorer.js';
 import { createHash } from 'crypto';
 
@@ -58,10 +60,12 @@ export interface ReviewerOptions {
 export class ContentReviewer {
   private passThreshold: number;
   private weights: ReviewWeights;
+  private protocol: GeoProtocolConfig;
 
   constructor(options?: ReviewerOptions) {
     this.passThreshold = options?.passThreshold ?? 70;
     this.weights = options?.weights ?? DEFAULT_REVIEW_WEIGHTS;
+    this.protocol = loadProtocolConfig();
   }
 
   review(article: Article, session: SessionData): ReviewResult {
@@ -75,6 +79,8 @@ export class ContentReviewer {
     const readabilityIssues = checkReadability(article);
     const safetyIssues = checkSafety(article);
     const truthfulnessIssues = checkTruthfulness(article, session);
+    // GEO 文章写作协议 v2.1 专项检查（条款映射到既有维度，见 geo-protocol.ts）
+    const geoProtocolIssues = checkGeoProtocol(article, session, this.protocol);
 
     const allIssues: ReviewIssue[] = [
       ...complianceIssues,
@@ -86,6 +92,7 @@ export class ContentReviewer {
       ...readabilityIssues,
       ...safetyIssues,
       ...truthfulnessIssues,
+      ...geoProtocolIssues,
     ];
 
     // Calculate scores for each dimension
@@ -115,15 +122,28 @@ export class ContentReviewer {
     const overallScore = calculateWeightedScore(dimensions, this.weights);
 
     // Veto conditions: certain critical issues auto-fail regardless of overall score
+    // 基于合并后的 allIssues 判定（含 GEO 协议检查产生的问题，如字数下限、缺 FAQ、缺 EK 引用）
     // 1. High-severity compliance issues (illegal/sensitive content)
-    const hasHighSeverityCompliance = complianceIssues.some((i) => i.severity === 'high');
+    const hasHighSeverityCompliance = allIssues.some(
+      (i) => i.dimension === 'compliance' && i.severity === 'high',
+    );
     // 2. High-severity platform adaptation issues (content doesn't meet platform minimum requirements)
-    const hasHighSeverityPlatform = platformAdaptationIssues.some((i) => i.severity === 'high');
+    const hasHighSeverityPlatform = allIssues.some(
+      (i) => i.dimension === 'platform_adaptation' && i.severity === 'high',
+    );
     // 3. High-severity safety issues (misleading claims, missing disclaimers)
-    const hasHighSeveritySafety = safetyIssues.some((i) => i.severity === 'high');
+    const hasHighSeveritySafety = allIssues.some(
+      (i) => i.dimension === 'safety' && i.severity === 'high',
+    );
     // 3b. High-severity truthfulness issues (fabricated data/products/contradictory facts)
-    const hasHighSeverityTruthfulness = truthfulnessIssues.some((i) => i.severity === 'high');
-    // 4. Any dimension scoring below 50 (critical failure in a single dimension)
+    const hasHighSeverityTruthfulness = allIssues.some(
+      (i) => i.dimension === 'truthfulness' && i.severity === 'high',
+    );
+    // 4. High-severity quality issues — 协议字数下限/硬上限、缺 FAQ 等硬性交付条款
+    const hasHighSeverityQuality = allIssues.some(
+      (i) => i.dimension === 'quality' && i.severity === 'high',
+    );
+    // 5. Any dimension scoring below 50 (critical failure in a single dimension)
     const minDimensionScore = Math.min(
       compliance.score, quality.score, seo.score, brand.score,
       originality.score, platform_adaptation.score, readability.score,
@@ -136,6 +156,7 @@ export class ContentReviewer {
       !hasHighSeverityPlatform &&
       !hasHighSeveritySafety &&
       !hasHighSeverityTruthfulness &&
+      !hasHighSeverityQuality &&
       minDimensionScore >= 50;
 
     // Extract all unique suggestions

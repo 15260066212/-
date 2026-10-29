@@ -100,6 +100,18 @@ export class SessionRepository {
     const rows = this.db
       .prepare('SELECT id, data, current_stage, created_at, updated_at FROM sessions WHERE user_id = ? ORDER BY created_at DESC')
       .all(userId) as Record<string, unknown>[];
+    return this.toListItems(rows);
+  }
+
+  /** Get every session regardless of owner (admin only). */
+  getAllSessions(): SessionListItem[] {
+    const rows = this.db
+      .prepare('SELECT id, data, current_stage, created_at, updated_at FROM sessions ORDER BY created_at DESC')
+      .all() as Record<string, unknown>[];
+    return this.toListItems(rows);
+  }
+
+  private toListItems(rows: Record<string, unknown>[]): SessionListItem[] {
     return rows.map((r) => {
       let enterpriseName: string | undefined;
       try {

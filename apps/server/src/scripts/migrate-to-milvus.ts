@@ -20,6 +20,9 @@
  *   按 30 条批次 embed + upsert。
  */
 
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
+
 import { DatabaseSync } from 'node:sqlite';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -47,12 +47,14 @@ export function createSessionRoutes(db: DatabaseAccess): Hono<AppEnv> {
     return c.json({ success: true });
   });
 
-  // GET /api/session - List sessions (filtered by current user)
+  // GET /api/session - List sessions (admin sees all, regular users see their own)
   sessionRoutes.get('/', (c) => {
     const user = c.get('user') as User | undefined;
     const userId = user?.id ?? 'user_default';
     // Query from DB for reliable listing (cache may not contain all sessions)
-    const sessions = db.sessions.getSessionsByUser(userId);
+    const sessions = user?.role === 'admin'
+      ? db.sessions.getAllSessions()
+      : db.sessions.getSessionsByUser(userId);
     return c.json({ success: true, data: sessions });
   });
 
